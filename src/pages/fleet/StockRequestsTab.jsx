@@ -209,8 +209,8 @@ export default function StockRequestsTab() {
   };
 
   const driverOptions = (driverState.rows || [])
-    .filter((driver) => driver.status === 'active' && driver.user_link?.user?.status === 'active' && driver.user_link.user.role?.code === 'driver')
-    .map((driver) => ({ value: driver.id, label: driver.user_link?.user?.full_name || driver.full_name }));
+    .filter((driver) => driver.status === 'active')
+    .map((driver) => ({ value: driver.id, label: driver.full_name }));
   const itemRows = (itemState.rows || []).filter((i) => i.status !== 'inactive');
   const itemOptions = itemRows.map((i) => ({ value: i.id, label: `${i.name} (${i.sku || i.barcode || 'no code'}) | avail ${Number(i.available_stock ?? (i.current_stock || 0))}`, item: i }));
 

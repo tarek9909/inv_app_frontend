@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Edit, Archive, RotateCcw, Trash2, Wallet, MapPin, Phone, Truck, User, Search, AlertCircle, RefreshCw } from 'lucide-react';
+import { Edit, Archive, RotateCcw, Trash2, Wallet, MapPin, Phone, Truck, User, Search, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Modal, { ConfirmModal } from '../../components/Modal.jsx';
 import { StatusBadge } from '../../components/DataTable.jsx';
@@ -7,7 +7,7 @@ import FilterBar from '../../components/FilterBar.jsx';
 import Pagination, { useClientPagination } from '../../components/Pagination.jsx';
 import FormField, { FormInput, FormSelect, FormTextarea, SubmitButton } from '../../components/FormField.jsx';
 import { toast } from '../../components/Toast.jsx';
-import { accountantStores, authStore, adminStores } from '../../state/index.js';
+import { accountantStores, authStore } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
 import { USER_STATUSES } from '../../domain/index.js';
 
@@ -15,7 +15,6 @@ export default function DriversTab() {
   const { rows, meta, loading, error } = useStore(accountantStores.drivers);
   const locationsState = useStore(accountantStores.locations);
   const { user } = useStore(authStore);
-  const usersState = useStore(adminStores.users);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
@@ -33,9 +32,6 @@ export default function DriversTab() {
   useEffect(() => {
     accountantStores.drivers.load();
     accountantStores.locations.load({ limit: 100 }).catch(() => {});
-    const permissions = user?.permissions || [];
-    const canLoadDriverUsers = user?.role?.code === 'admin' || ['team.view', 'users.manage', 'drivers.create', 'drivers.update', 'stock_requests.create'].some((permission) => permissions.includes(permission));
-    if (canLoadDriverUsers) adminStores.users.load({ limit: 100, role_code: 'driver', status: 'active' });
   }, [user]);
 
   const can = (permission) => user?.role?.code === 'admin' || (user?.permissions || []).includes(permission);
@@ -56,34 +52,24 @@ export default function DriversTab() {
 
   const pagination = useClientPagination(filteredRows, 12);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ user_id: '', location_id: '', full_name: '', phone: '', address: '', id_number: '', vehicle_type: '', vehicle_plate_number: '', monthly_salary: '', notes: '', status: 'active' });
-    setErrors({});
-    setModalOpen(true);
-  };
+  const openCreate = null; // Drivers are created via Team → Add User with driver role
 
   const openEdit = (row) => {
     setEditing(row);
-    setForm({ user_id: row.user_id || '', location_id: row.location_id || row.current_location_id || '', full_name: row.full_name || '', phone: row.phone || '', address: row.address || '', id_number: row.id_number || '', vehicle_type: row.vehicle_type || '', vehicle_plate_number: row.vehicle_plate_number || '', monthly_salary: row.monthly_salary ?? '', notes: row.notes || '', status: row.status || 'active' });
+    setForm({ location_id: row.location_id || row.current_location_id || '', phone: row.phone || '', address: row.address || '', id_number: row.id_number || '', vehicle_type: row.vehicle_type || '', vehicle_plate_number: row.vehicle_plate_number || '', monthly_salary: row.monthly_salary ?? '', notes: row.notes || '', status: row.status || 'active' });
     setErrors({});
     setModalOpen(true);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.full_name.trim()) { setErrors({ full_name: 'Name is required' }); return; }
+    if (!editing) return;
 
     setSaving(true);
     try {
-      const payload = { ...form, user_id: form.user_id ? Number(form.user_id) : null, location_id: form.location_id ? Number(form.location_id) : null, monthly_salary: Number(form.monthly_salary || 0) };
-      if (editing) {
-        await accountantStores.drivers.update(editing.id, payload);
-        toast.success('Driver updated');
-      } else {
-        await accountantStores.drivers.create(payload);
-        toast.success('Driver created');
-      }
+      const payload = { ...form, location_id: form.location_id ? Number(form.location_id) : null, monthly_salary: Number(form.monthly_salary || 0) };
+      await accountantStores.drivers.update(editing.id, payload);
+      toast.success('Driver updated');
       setModalOpen(false);
       accountantStores.drivers.load();
     } catch (err) {
@@ -147,9 +133,6 @@ export default function DriversTab() {
   const locationOptions = (locationsState.rows || [])
     .filter((location) => location.status === 'active' || Number(location.id) === Number(form.location_id))
     .map((location) => ({ value: location.id, label: location.name }));
-  const driverUserOptions = (usersState.rows || [])
-    .filter((account) => account.role?.code === 'driver' && account.status === 'active')
-    .map((account) => ({ value: account.id, label: `${account.full_name} (${account.email})` }));
 
   const { page = 1, pages = 1 } = meta;
 
@@ -169,11 +152,6 @@ export default function DriversTab() {
           />
         </div>
         <div style={{ marginLeft: 'auto' }}>
-          {can('drivers.create') && (
-            <button className="glass-button" style={{ fontSize: '13px', padding: '10px 18px' }} onClick={openCreate}>
-              <Plus size={16} /> Add Driver
-            </button>
-          )}
         </div>
       </div>
 
@@ -323,14 +301,8 @@ export default function DriversTab() {
       )}
 
       {/* Modals */}
-      <Modal open={modalOpen} title={editing ? 'Edit Driver' : 'Add Driver'} onClose={() => setModalOpen(false)} width="520px">
+      <Modal open={modalOpen} title={editing ? `Edit Driver — ${editing.full_name}` : 'Edit Driver'} onClose={() => setModalOpen(false)} width="520px">
         <form onSubmit={handleSubmit}>
-          <FormField label="Full Name" required error={errors.full_name}>
-            <FormInput value={form.full_name} onChange={(v) => { setForm({ ...form, full_name: v }); setErrors({}); }} placeholder="Driver name" />
-          </FormField>
-          <FormField label="Linked Login Account">
-            <FormSelect value={form.user_id} onChange={(v) => setForm({ ...form, user_id: v })} placeholder="No linked login" options={driverUserOptions} />
-          </FormField>
           <FormField label="Location">
             <FormSelect value={form.location_id} onChange={(v) => setForm({ ...form, location_id: v })} placeholder="No assigned location" options={locationOptions} />
           </FormField>
@@ -362,7 +334,7 @@ export default function DriversTab() {
           <FormField label="Status">
             <FormSelect value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={USER_STATUSES.map((status) => ({ value: status, label: status }))} />
           </FormField>
-          <SubmitButton loading={saving}>{editing ? 'Update' : 'Create'}</SubmitButton>
+          <SubmitButton loading={saving}>Update Driver</SubmitButton>
         </form>
       </Modal>
 

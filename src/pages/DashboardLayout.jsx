@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Bell, CheckCheck, Menu, X, Sun, Moon } from 'lucide-react';
-import { authStore, notificationStore } from '../state/index.js';
+import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Menu, X, Sun, Moon } from 'lucide-react';
+import { authStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,8 +10,6 @@ import { toast } from '../components/Toast.jsx';
 
 export default function DashboardLayout() {
   const { user } = useStore(authStore);
-  const notificationState = useStore(notificationStore);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
@@ -39,12 +37,6 @@ export default function DashboardLayout() {
       }).catch(() => navigate('/'));
     }
   }, [user, navigate]);
-
-  useEffect(() => {
-    if (user && canAccess({ permission: 'notifications.view' })) {
-      notificationStore.load({ limit: 20 }).catch(() => {});
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -191,15 +183,6 @@ export default function DashboardLayout() {
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            {canAccess({ permission: 'notifications.view' }) && (
-              <div style={{ position: 'relative' }}>
-                <button onClick={() => setNotificationsOpen(!notificationsOpen)} title="Notifications" style={{ position: 'relative', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                  <Bell size={18} />
-                  {(notificationState.rows || []).filter((n) => !n.read_at).length > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-5px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '999px', background: 'var(--accent-red)', color: 'white', fontSize: '11px', display: 'grid', placeItems: 'center' }}>{(notificationState.rows || []).filter((n) => !n.read_at).length}</span>}
-                </button>
-                {notificationsOpen && <NotificationDrawer rows={notificationState.rows || []} onMarkAll={() => notificationStore.markAllRead().catch(() => {})} onClose={() => setNotificationsOpen(false)} />}
-              </div>
-            )}
             <div className="header-welcome" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               Welcome back, {user.full_name.split(' ')[0]}
             </div>
@@ -211,28 +194,6 @@ export default function DashboardLayout() {
         </div>
       </main>
     </div>
-  );
-}
-
-function NotificationDrawer({ rows, onMarkAll, onClose }) {
-  return (
-    <>
-      {/* Mobile backdrop for notifications */}
-      <div className="show-tablet-only" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 19 }} />
-      <div className="glass-card notification-drawer" style={{ position: 'absolute', right: 0, top: '46px', width: '360px', maxHeight: '440px', overflow: 'auto', zIndex: 20, padding: 0 }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <strong style={{ fontSize: '14px' }}>Notifications</strong>
-          <button onClick={onMarkAll} title="Mark all read" style={{ background: 'transparent', border: 0, color: 'var(--accent-blue)', cursor: 'pointer' }}><CheckCheck size={17} /></button>
-        </div>
-        {rows.length ? rows.map((row) => (
-          <div key={row.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', background: row.read_at ? 'transparent' : 'rgba(59,130,246,0.06)' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600 }}>{row.title}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{row.message}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : ''}</div>
-          </div>
-        )) : <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</div>}
-      </div>
-    </>
   );
 }
 
