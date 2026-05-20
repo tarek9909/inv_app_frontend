@@ -7,6 +7,7 @@ import { reportStore } from '../state/index.js';
 import { getApiConfig, tokenStorage, buildQuery } from '../api/index.js';
 import { useStore } from '../hooks/useStore.js';
 import { StatusBadge } from '../components/DataTable.jsx';
+import CustomSelect from '../components/CustomSelect.jsx';
 
 const TABS = [
   { key: 'payroll', label: 'Payroll' },
@@ -262,10 +263,9 @@ function DriverReportsTab({ overview, detail, selectedDriverId, onSelectDriver, 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <ReportSection title="Driver Report Overview" icon={Users} loading={loading}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-          <select value={selectedDriverId} onChange={(e) => onSelectDriver(e.target.value)} className="glass-input" style={{ maxWidth: '260px', fontSize: '13px' }}>
-            <option value="">All drivers</option>
-            {driverOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
+          <div style={{ maxWidth: '260px', width: '100%' }}>
+            <CustomSelect value={selectedDriverId} onChange={(v) => onSelectDriver(v)} options={driverOptions} placeholder="All drivers" />
+          </div>
           <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Period: {overview?.period || '—'}</span>
         </div>
         {pagination.items.length ? (
@@ -365,10 +365,9 @@ function DriverKpisTab({ data, loading }) {
   return (
     <ReportSection title="Driver Target KPIs" icon={Users} loading={loading} summary={<span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Period: {data?.period || '—'}</span>}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-        <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="glass-input" style={{ maxWidth: '220px', fontSize: '13px', padding: '7px 10px' }}>
-          <option value="">All locations</option>
-          {locationOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-        </select>
+        <div style={{ maxWidth: '220px', width: '100%' }}>
+          <CustomSelect value={locationFilter} onChange={(v) => setLocationFilter(v)} options={locationOptions} placeholder="All locations" />
+        </div>
       </div>
       {pagination.items.length ? (
         <>

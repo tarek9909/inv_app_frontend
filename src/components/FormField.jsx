@@ -1,4 +1,5 @@
 import React from 'react';
+import CustomSelect from './CustomSelect.jsx';
 
 export default function FormField({ label, error, children, required }) {
   return (
@@ -28,19 +29,15 @@ export function FormInput({ value, onChange, type = 'text', placeholder, ...prop
   );
 }
 
-export function FormSelect({ value, onChange, options = [], placeholder }) {
+export function FormSelect({ value, onChange, options = [], placeholder, disabled }) {
   return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-      className="glass-input"
-      style={{ fontSize: '14px', appearance: 'none' }}
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+    <CustomSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
   );
 }
 
