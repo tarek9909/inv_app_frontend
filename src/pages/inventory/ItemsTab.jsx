@@ -4,6 +4,7 @@ import DataTable, { ActionButton, StatusBadge } from '../../components/DataTable
 import FilterBar from '../../components/FilterBar.jsx';
 import Modal, { ConfirmModal } from '../../components/Modal.jsx';
 import FormField, { FormInput, FormSelect, SubmitButton } from '../../components/FormField.jsx';
+import PremiumCheckbox from '../../components/PremiumCheckbox.jsx';
 import { toast } from '../../components/Toast.jsx';
 import { authStore, inventoryStores } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
@@ -355,9 +356,10 @@ export default function ItemsTab() {
               <FormInput type="number" value={form.minimum_stock} onChange={(v) => setForm({ ...form, minimum_stock: v })} placeholder="0" min="0" />
             </FormField>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '13px', margin: '8px 0 16px' }}>
-            <input type="checkbox" checked={form.track_batches} onChange={(e) => setForm({ ...form, track_batches: e.target.checked })} /> Track batches and expiry
-          </label>
+          <div onClick={() => setForm({ ...form, track_batches: !form.track_batches })} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-secondary)', fontSize: '13px', margin: '8px 0 16px', cursor: 'pointer', padding: '10px 12px', borderRadius: '10px', background: form.track_batches ? 'rgba(56, 189, 248, 0.06)' : 'transparent', border: form.track_batches ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid transparent', transition: 'all 0.15s' }}>
+            <PremiumCheckbox checked={form.track_batches} onChange={(v) => setForm({ ...form, track_batches: v })} />
+            <span style={{ color: form.track_batches ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: form.track_batches ? 500 : 400, transition: 'color 0.15s' }}>Track batches and expiry</span>
+          </div>
           <FormField label="Status">
             <FormSelect value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={ACTIVE_STATUSES.map((s) => ({ value: s, label: s }))} />
           </FormField>

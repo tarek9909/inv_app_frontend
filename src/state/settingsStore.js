@@ -6,6 +6,10 @@ export const createSettingsStore = ({ settingsApi = api.settings } = {}) => {
   let inFlightLoad = null;
   let lastLoadAt = 0;
   let lastResult = null;
+  const invalidateLoadCache = () => {
+    lastLoadAt = 0;
+    lastResult = null;
+  };
   return {
     ...store,
     async load({ force = false } = {}) {
@@ -34,6 +38,7 @@ export const createSettingsStore = ({ settingsApi = api.settings } = {}) => {
       store.setState({ saving: true, error: null });
       try {
         const result = await settingsApi.update(payload);
+        invalidateLoadCache();
         store.setState({ settings: result.data || {}, saving: false });
         return result;
       } catch (error) {

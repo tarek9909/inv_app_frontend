@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckSquare, Eye, Printer } from 'lucide-react';
 import DataTable, { ActionButton, StatusBadge } from '../components/DataTable.jsx';
 import Modal from '../components/Modal.jsx';
+import PremiumCheckbox from '../components/PremiumCheckbox.jsx';
 import { driverStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
 import { toast } from '../components/Toast.jsx';
@@ -156,12 +157,10 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
             {(request.items || []).map((line) => (
               <tr key={line.id}>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>
-                  <input
-                    type="checkbox"
+                  <PremiumCheckbox
                     checked={Boolean(checks[line.id])}
                     disabled={receiptSubmitted}
-                    onChange={(event) => setChecks({ ...checks, [line.id]: event.target.checked })}
-                    style={{ width: '18px', height: '18px' }}
+                    onChange={(v) => setChecks({ ...checks, [line.id]: v })}
                   />
                 </td>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>{line.item?.name || `Item #${line.item_id}`}</td>

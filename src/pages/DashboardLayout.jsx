@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Bell, CheckCheck, Menu, X } from 'lucide-react';
+import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Bell, CheckCheck, Menu, X, Sun, Moon } from 'lucide-react';
 import { authStore, notificationStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
+import { useTheme } from '../hooks/useTheme.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import FormField, { FormInput, SubmitButton } from '../components/FormField.jsx';
 import { toast } from '../components/Toast.jsx';
@@ -12,6 +13,7 @@ export default function DashboardLayout() {
   const notificationState = useStore(notificationStore);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { theme, toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -119,7 +121,7 @@ export default function DashboardLayout() {
           <button
             className="sidebar-close-btn"
             onClick={() => setSidebarOpen(false)}
-            style={{ display: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '8px', alignItems: 'center', justifyContent: 'center' }}
+            style={{ display: 'none', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '8px', alignItems: 'center', justifyContent: 'center' }}
           >
             <X size={18} />
           </button>
@@ -174,16 +176,24 @@ export default function DashboardLayout() {
             <button
               className="mobile-menu-btn"
               onClick={() => setSidebarOpen(true)}
-              style={{ display: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
+              style={{ display: 'none', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
             >
               <Menu size={18} />
             </button>
             <h1 style={{ fontSize: '20px', fontWeight: '600' }}>{navItems.find(i => location.pathname === i.path || (i.path !== '/dashboard' && location.pathname.startsWith(i.path)))?.label || 'Dashboard'}</h1>
           </div>
           <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             {canAccess({ permission: 'notifications.view' }) && (
               <div style={{ position: 'relative' }}>
-                <button onClick={() => setNotificationsOpen(!notificationsOpen)} title="Notifications" style={{ position: 'relative', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                <button onClick={() => setNotificationsOpen(!notificationsOpen)} title="Notifications" style={{ position: 'relative', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                   <Bell size={18} />
                   {(notificationState.rows || []).filter((n) => !n.read_at).length > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-5px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '999px', background: 'var(--accent-red)', color: 'white', fontSize: '11px', display: 'grid', placeItems: 'center' }}>{(notificationState.rows || []).filter((n) => !n.read_at).length}</span>}
                 </button>

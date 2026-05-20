@@ -15,6 +15,10 @@ export const createResourceStore = ({ api, initialFilters = { page: 1, limit: 20
     lastMessage: ''
   });
 
+  const invalidateLoadCache = () => {
+    lastLoad = { key: '', at: 0, result: null };
+  };
+
   const run = async (flag, action) => {
     store.setState({ [flag]: true, error: null, lastMessage: '' });
     try {
@@ -57,12 +61,14 @@ export const createResourceStore = ({ api, initialFilters = { page: 1, limit: 20
 
   const create = async (payload) => run('saving', async () => {
     const result = await api.create(payload);
+    invalidateLoadCache();
     store.setState((state) => ({ rows: [result.data, ...state.rows].filter(Boolean) }));
     return result;
   });
 
   const update = async (id, payload) => run('saving', async () => {
     const result = await api.update(id, payload);
+    invalidateLoadCache();
     store.setState((state) => ({
       rows: state.rows.map((row) => (row?.id === result.data?.id ? result.data : row)),
       current: state.current?.id === result.data?.id ? result.data : state.current
@@ -72,6 +78,7 @@ export const createResourceStore = ({ api, initialFilters = { page: 1, limit: 20
 
   const remove = async (id) => run('saving', async () => {
     const result = await api.delete(id);
+    invalidateLoadCache();
     store.setState((state) => ({
       rows: state.rows.filter((row) => row?.id !== id),
       current: state.current?.id === id ? null : state.current

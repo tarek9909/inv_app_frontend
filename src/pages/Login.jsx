@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogIn, KeyRound, Mail, AlertCircle } from 'lucide-react';
+import { LogIn, KeyRound, Mail, AlertCircle, Sun, Moon } from 'lucide-react';
 import { authStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
+import { useTheme } from '../hooks/useTheme.js';
 
 const defaultPathForUser = (user) => {
   const permissions = user?.permissions || [];
@@ -20,6 +21,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { loading, error } = useStore(authStore);
+  const { toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -33,7 +35,16 @@ export default function Login() {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '20px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '20px', position: 'relative' }}>
+      {/* Theme toggle on login page */}
+      <button
+        onClick={toggleTheme}
+        className="theme-toggle-btn"
+        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        style={{ position: 'absolute', top: '20px', right: '20px' }}
+      >
+        {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
       <motion.div 
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}

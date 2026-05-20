@@ -1,4 +1,4 @@
-import { DEFAULT_API_TIMEOUT_MS, getApiConfig, normalizeBaseUrl } from './config.js';
+import { DEFAULT_API_CACHE_MS, DEFAULT_API_TIMEOUT_MS, getApiConfig, normalizeBaseUrl } from './config.js';
 import { tokenStorage } from './tokenStorage.js';
 
 export class ApiError extends Error {
@@ -23,7 +23,12 @@ export const buildQuery = (params = {}) => {
   return value ? `?${value}` : '';
 };
 
-export const createHttpClient = ({ baseUrl, getToken = tokenStorage.get, onUnauthorized, timeoutMs } = {}) => {
+export const createHttpClient = ({ baseUrl, getToken = tokenStorage.get, onUnauthorized, timeoutMs, cacheMs } = {}) => {
+  const inFlightGets = new Map();
+  const responseCache = new Map();
+
+  const clearResponseCache = () => responseCache.clear();
+
   const request = async (path, options = {}) => {
     const method = (options.method || 'GET').toUpperCase();
     const token = getToken?.();
@@ -42,10 +47,27 @@ export const createHttpClient = ({ baseUrl, getToken = tokenStorage.get, onUnaut
     };
     const resolvedBaseUrl = normalizeBaseUrl(baseUrl || apiConfig.baseUrl);
     const url = `${resolvedBaseUrl}${path}${buildQuery(options.query)}`;
+    const isGet = method === 'GET';
+    const configuredCacheMs = Number(options.cacheMs ?? cacheMs ?? apiConfig.cacheMs ?? DEFAULT_API_CACHE_MS);
+    const requestCacheMs = Number.isFinite(configuredCacheMs) && configuredCacheMs >= 0
+      ? configuredCacheMs
+      : DEFAULT_API_CACHE_MS;
+    const cacheKey = isGet
+      ? `${url}|${token || ''}|${JSON.stringify(options.headers || {})}`
+      : '';
+
+    if (isGet && requestCacheMs > 0) {
+      const cached = responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.at < requestCacheMs) return cached.result;
+      if (cached) responseCache.delete(cacheKey);
+    }
+
+    if (isGet && inFlightGets.has(cacheKey)) return inFlightGets.get(cacheKey);
+
     let response;
     let payload;
 
-    try {
+    const fetchPromise = (async () => {
       response = await fetch(url, {
         ...options,
         method,
@@ -54,6 +76,37 @@ export const createHttpClient = ({ baseUrl, getToken = tokenStorage.get, onUnaut
         body: hasBody(method) && options.body !== undefined ? JSON.stringify(options.body) : undefined
       });
       payload = await readPayload(response);
+
+      if (!response.ok || payload?.success === false) {
+        if (response.status === 401) onUnauthorized?.();
+        throw new ApiError({
+          status: response.status,
+          message: payload?.message || response.statusText,
+          errors: payload?.errors,
+          response: payload
+        });
+      }
+
+      const result = {
+        data: payload?.data,
+        meta: payload?.meta || {},
+        message: payload?.message || '',
+        raw: payload
+      };
+
+      if (isGet && requestCacheMs > 0) {
+        responseCache.set(cacheKey, { at: Date.now(), result });
+      } else if (!isGet) {
+        clearResponseCache();
+      }
+
+      return result;
+    })();
+
+    if (isGet) inFlightGets.set(cacheKey, fetchPromise);
+
+    try {
+      return await fetchPromise;
     } catch (error) {
       if (error.name === 'AbortError') {
         throw new ApiError({
@@ -66,24 +119,8 @@ export const createHttpClient = ({ baseUrl, getToken = tokenStorage.get, onUnaut
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      if (isGet) inFlightGets.delete(cacheKey);
     }
-
-    if (!response.ok || payload?.success === false) {
-      if (response.status === 401) onUnauthorized?.();
-      throw new ApiError({
-        status: response.status,
-        message: payload?.message || response.statusText,
-        errors: payload?.errors,
-        response: payload
-      });
-    }
-
-    return {
-      data: payload?.data,
-      meta: payload?.meta || {},
-      message: payload?.message || '',
-      raw: payload
-    };
   };
 
   return {
@@ -91,7 +128,8 @@ export const createHttpClient = ({ baseUrl, getToken = tokenStorage.get, onUnaut
     post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
     patch: (path, body, options) => request(path, { ...options, method: 'PATCH', body }),
     delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
-    request
+    request,
+    clearResponseCache
   };
 };
 

@@ -4,6 +4,7 @@ import DataTable, { ActionButton, StatusBadge } from '../components/DataTable.js
 import FilterBar from '../components/FilterBar.jsx';
 import Modal from '../components/Modal.jsx';
 import FormField, { FormInput, FormSelect, SubmitButton } from '../components/FormField.jsx';
+import PremiumCheckbox from '../components/PremiumCheckbox.jsx';
 import { toast } from '../components/Toast.jsx';
 import { adminStores, authStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
@@ -264,20 +265,45 @@ export default function TeamPage() {
           {roleForm.code === 'admin' ? (
             <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>Admin always has all permissions.</p>
           ) : (
-            <div style={{ maxHeight: '420px', overflow: 'auto', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+            <div style={{ maxHeight: '420px', overflow: 'auto', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '16px', marginBottom: '16px', background: 'var(--surface-subtle)' }}>
               {Object.entries(groupedPermissions).map(([module, features]) => (
-                <div key={module} style={{ marginBottom: '18px' }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '8px' }}>{module}</h3>
+                <div key={module} style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--glass-border)' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(139, 92, 246, 0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Shield size={14} color="var(--accent-blue)" />
+                    </div>
+                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{module}</h3>
+                  </div>
                   {Object.entries(features).map(([feature, permissions]) => (
-                    <div key={feature} style={{ marginBottom: '10px', paddingLeft: '8px' }}>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>{feature}</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
-                        {permissions.map((permission) => (
-                          <label key={permission.permission_key} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', cursor: 'pointer' }}>
-                            <input type="checkbox" checked={rolePermissions.includes(permission.permission_key)} onChange={() => togglePermission(permission.permission_key)} />
-                            <span><strong>{permission.permission_key}</strong><div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{permission.description}</div></span>
-                          </label>
-                        ))}
+                    <div key={feature} style={{ marginBottom: '14px', paddingLeft: '12px' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', fontWeight: 500 }}>{feature}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px' }}>
+                        {permissions.map((permission) => {
+                          const isChecked = rolePermissions.includes(permission.permission_key);
+                          return (
+                            <div
+                              key={permission.permission_key}
+                              onClick={() => togglePermission(permission.permission_key)}
+                              style={{
+                                display: 'flex',
+                                gap: '10px',
+                                alignItems: 'flex-start',
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                background: isChecked ? 'rgba(56, 189, 248, 0.06)' : 'transparent',
+                                border: isChecked ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid transparent',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <PremiumCheckbox checked={isChecked} onChange={() => togglePermission(permission.permission_key)} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: '12px', fontWeight: 600, color: isChecked ? 'var(--accent-blue)' : 'var(--text-primary)', transition: 'color 0.15s' }}>{permission.permission_key}</div>
+                                {permission.description && <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px', lineHeight: '1.4' }}>{permission.description}</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
