@@ -15,7 +15,7 @@ export default function TabBar({ tabs, active, onChange }) {
   };
 
   return (
-    <div role="tablist" style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--glass-border)', marginBottom: '20px', overflowX: 'auto' }}>
+    <div role="tablist" className="tab-bar" style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--glass-border)', marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       {tabs.map((tab, idx) => {
         const isActive = active === tab.key;
         return (
@@ -36,7 +36,8 @@ export default function TabBar({ tabs, active, onChange }) {
               fontWeight: isActive ? '600' : '400',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
           >
             {tab.label}

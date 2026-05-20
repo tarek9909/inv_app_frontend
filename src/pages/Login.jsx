@@ -38,7 +38,7 @@ export default function Login() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="glass-panel"
+        className="glass-panel login-panel"
         style={{ width: '100%', maxWidth: '420px', padding: '40px 30px' }}
       >
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>

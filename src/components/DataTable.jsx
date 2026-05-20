@@ -22,8 +22,8 @@ export default function DataTable({ columns, rows, meta = {}, loading, error, on
   return (
     <div className="glass-card" style={{ overflow: 'hidden' }}>
       {/* Toolbar */}
-      <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: '1', minWidth: '200px', maxWidth: '320px' }}>
+      <div className="table-toolbar" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap' }}>
+        <div className="search-wrapper" style={{ position: 'relative', flex: '1', minWidth: '200px', maxWidth: '320px' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
@@ -34,12 +34,12 @@ export default function DataTable({ columns, rows, meta = {}, loading, error, on
             style={{ paddingLeft: '36px', padding: '8px 12px 8px 36px', fontSize: '13px' }}
           />
         </div>
-        {toolbar && <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>{toolbar}</div>}
+        {toolbar && <div className="toolbar-actions" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>{toolbar}</div>}
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      {/* Desktop Table View */}
+      <div className="table-desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: columns.length > 4 ? '700px' : 'auto' }}>
           <thead>
             <tr>
               {columns.map((col) => (
@@ -102,12 +102,78 @@ export default function DataTable({ columns, rows, meta = {}, loading, error, on
         </table>
       </div>
 
+      {/* Mobile/Tablet Card Grid View */}
+      <div className="table-card-view" style={{ display: 'none' }}>
+        {loading ? (
+          <div style={{ padding: '16px', display: 'grid', gap: '12px' }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={{ padding: '16px', borderRadius: '12px', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ height: '14px', width: '40%', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', animation: 'pulse 1.5s infinite', marginBottom: '12px' }} />
+                <div style={{ height: '12px', width: '70%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', animation: 'pulse 1.5s infinite', marginBottom: '8px' }} />
+                <div style={{ height: '12px', width: '55%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', animation: 'pulse 1.5s infinite' }} />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div style={{ padding: '40px 16px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <AlertCircle size={24} color="var(--accent-red)" />
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{error?.message || 'Failed to load data'}</span>
+              <button onClick={() => onLoad?.({})} style={{ background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                <RefreshCw size={14} /> Retry
+              </button>
+            </div>
+          </div>
+        ) : rows.length === 0 ? (
+          <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+            {emptyMessage}
+          </div>
+        ) : (
+          <div style={{ padding: '12px', display: 'grid', gap: '10px' }}>
+            {rows.map((row, idx) => (
+              <div
+                key={row.id || idx}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--glass-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                {/* Card fields */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px 12px' }}>
+                  {columns.map((col) => (
+                    <div key={col.key} style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>
+                        {col.label}
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {col.render ? col.render(row) : row[col.key] ?? '-'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Card actions */}
+                {actions && (
+                  <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)', marginTop: '4px' }}>
+                    {actions(row)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Pagination */}
       {!loading && !error && rows.length > 0 && (
-        <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', fontSize: '13px', color: 'var(--text-secondary)' }}>
+        <div className="table-pagination" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', fontSize: '13px', color: 'var(--text-secondary)' }}>
           <span>{total} record{total !== 1 ? 's' : ''}</span>
           {pages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
               <PgBtn onClick={() => goToPage(1)} disabled={page <= 1}><ChevronsLeft size={14} /></PgBtn>
               <PgBtn onClick={() => goToPage(page - 1)} disabled={page <= 1}><ChevronLeft size={14} /></PgBtn>
               {getPageNumbers(page, pages).map((p, idx) => (
@@ -171,7 +237,7 @@ export function StatusBadge({ status, colorMap = {} }) {
   };
   const color = colorMap[status] || defaultColors[status] || 'var(--text-secondary)';
   return (
-    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: `color-mix(in srgb, ${color} 15%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, textTransform: 'capitalize' }}>
+    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: `color-mix(in srgb, ${color} 15%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
       {status?.replace(/_/g, ' ') || '-'}
     </span>
   );

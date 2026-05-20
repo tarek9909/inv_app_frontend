@@ -127,7 +127,7 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+      <div className="info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
         <Info label="Status" value={<StatusBadge status={request.request_status} />} />
         <Info label="Receipt" value={<ReceiptBadge request={request} />} />
         <Info label="Payment" value={<StatusBadge status={request.payment_status} />} />
@@ -136,7 +136,7 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
         <Info label="Remaining" value={money(request.remaining_amount)} />
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      <div className="driver-detail-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button type="button" className="glass-button" onClick={printInvoice} disabled={savingInvoice || request.request_status !== 'approved'}>
           <Printer size={16} /> {savingInvoice ? 'Opening...' : request.driver_invoice_viewed_at ? 'Print Invoice Again' : 'Open Printable Invoice'}
         </button>

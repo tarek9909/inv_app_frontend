@@ -49,14 +49,14 @@ export default function DashboardHome() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Metrics Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         {METRICS.map((metric, idx) => {
           const Icon = metric.icon;
           const value = dashboard?.[metric.key];
           return (
-            <motion.div key={metric.key} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="glass-card" style={{ padding: '20px' }}>
+            <motion.div key={metric.key} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="glass-card metric-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{metric.label}</span>
+                <span className="metric-label" style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{metric.label}</span>
                 <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `color-mix(in srgb, ${metric.color} 15%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon size={16} color={metric.color} />
                 </div>
@@ -64,7 +64,7 @@ export default function DashboardHome() {
               {loading || value === undefined ? (
                 <div style={{ height: '28px', width: '70px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', animation: 'pulse 1.5s infinite' }} />
               ) : (
-                <div style={{ fontSize: '26px', fontWeight: '700' }}>{value?.toLocaleString?.() ?? value}</div>
+                <div className="metric-value" style={{ fontSize: '26px', fontWeight: '700' }}>{value?.toLocaleString?.() ?? value}</div>
               )}
             </motion.div>
           );
@@ -72,7 +72,7 @@ export default function DashboardHome() {
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+      <div className="content-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
         {/* Recent Stock Requests */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass-card" style={{ overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -196,7 +196,7 @@ export default function DashboardHome() {
             <TrendingUp size={16} color="var(--accent-blue)" />
             <h3 style={{ fontSize: '14px', fontWeight: '600' }}>Quick Actions</h3>
           </div>
-          <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="quick-actions-grid">
             <QuickAction icon={ClipboardList} label="New Stock Request" color="var(--accent-purple)" onClick={() => navigate('/dashboard/fleet')} />
             <QuickAction icon={Package} label="Manage Inventory" color="var(--accent-blue)" onClick={() => navigate('/dashboard/inventory')} />
             <QuickAction icon={CreditCard} label="Record Payment" color="var(--accent-green)" onClick={() => navigate('/dashboard/fleet')} />

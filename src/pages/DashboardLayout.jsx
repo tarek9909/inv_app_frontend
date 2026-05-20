@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Bell, CheckCheck } from 'lucide-react';
+import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Bell, CheckCheck, Menu, X } from 'lucide-react';
 import { authStore, notificationStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import FormField, { FormInput, SubmitButton } from '../components/FormField.jsx';
 import { toast } from '../components/Toast.jsx';
 
@@ -11,6 +11,7 @@ export default function DashboardLayout() {
   const { user } = useStore(authStore);
   const notificationState = useStore(notificationStore);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -51,6 +52,21 @@ export default function DashboardLayout() {
     }
   }, [user, location.pathname, navigate]);
 
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
+
   const handleLogout = () => {
     authStore.logout();
     navigate('/');
@@ -64,29 +80,56 @@ export default function DashboardLayout() {
   if (activeItem && !canAccess(activeItem)) return null;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', padding: '20px', gap: '24px' }}>
+    <div className="dashboard-layout" style={{ display: 'flex', minHeight: '100vh', padding: '20px', gap: '24px' }}>
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.6)',
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
+              zIndex: 999
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
-      <motion.aside 
-        initial={{ opacity: 0, x: -30 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="glass-panel"
+      <aside
+        className={`glass-panel dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}
         style={{ width: '280px', display: 'flex', flexDirection: 'column', padding: '24px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={20} color="white" />
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Stock Driver</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Logistics System</p>
           </div>
+          {/* Close button for mobile */}
+          <button
+            className="sidebar-close-btn"
+            onClick={() => setSidebarOpen(false)}
+            style={{ display: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '8px', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
           {navItems.filter(item => canAccess(item)).map((item) => {
             const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
             return (
-              <div 
+              <div
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
@@ -105,41 +148,49 @@ export default function DashboardLayout() {
         </nav>
 
         <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', flexShrink: 0 }}>
               {user.full_name?.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user.full_name}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '14px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.full_name}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{user.role?.name}</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '8px' }}>
+          <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '8px', flexShrink: 0 }}>
             <LogOut size={20} />
           </button>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main Content Area */}
-      <motion.main 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1 }}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}
+      <main
+        className="dashboard-main"
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}
       >
-        <header className="glass-panel" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: '600' }}>{navItems.find(i => location.pathname === i.path || (i.path !== '/dashboard' && location.pathname.startsWith(i.path)))?.label || 'Dashboard'}</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <header className="glass-panel dashboard-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Hamburger menu button */}
+            <button
+              className="mobile-menu-btn"
+              onClick={() => setSidebarOpen(true)}
+              style={{ display: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Menu size={18} />
+            </button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600' }}>{navItems.find(i => location.pathname === i.path || (i.path !== '/dashboard' && location.pathname.startsWith(i.path)))?.label || 'Dashboard'}</h1>
+          </div>
+          <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             {canAccess({ permission: 'notifications.view' }) && (
               <div style={{ position: 'relative' }}>
                 <button onClick={() => setNotificationsOpen(!notificationsOpen)} title="Notifications" style={{ position: 'relative', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                   <Bell size={18} />
                   {(notificationState.rows || []).filter((n) => !n.read_at).length > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-5px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '999px', background: 'var(--accent-red)', color: 'white', fontSize: '11px', display: 'grid', placeItems: 'center' }}>{(notificationState.rows || []).filter((n) => !n.read_at).length}</span>}
                 </button>
-                {notificationsOpen && <NotificationDrawer rows={notificationState.rows || []} onMarkAll={() => notificationStore.markAllRead().catch(() => {})} />}
+                {notificationsOpen && <NotificationDrawer rows={notificationState.rows || []} onMarkAll={() => notificationStore.markAllRead().catch(() => {})} onClose={() => setNotificationsOpen(false)} />}
               </div>
             )}
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            <div className="header-welcome" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               Welcome back, {user.full_name.split(' ')[0]}
             </div>
           </div>
@@ -148,26 +199,30 @@ export default function DashboardLayout() {
         <div style={{ flex: 1, overflow: 'auto' }}>
           <Outlet />
         </div>
-      </motion.main>
+      </main>
     </div>
   );
 }
 
-function NotificationDrawer({ rows, onMarkAll }) {
+function NotificationDrawer({ rows, onMarkAll, onClose }) {
   return (
-    <div className="glass-card" style={{ position: 'absolute', right: 0, top: '46px', width: '360px', maxHeight: '440px', overflow: 'auto', zIndex: 20, padding: 0 }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong style={{ fontSize: '14px' }}>Notifications</strong>
-        <button onClick={onMarkAll} title="Mark all read" style={{ background: 'transparent', border: 0, color: 'var(--accent-blue)', cursor: 'pointer' }}><CheckCheck size={17} /></button>
-      </div>
-      {rows.length ? rows.map((row) => (
-        <div key={row.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', background: row.read_at ? 'transparent' : 'rgba(59,130,246,0.06)' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600 }}>{row.title}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{row.message}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : ''}</div>
+    <>
+      {/* Mobile backdrop for notifications */}
+      <div className="show-tablet-only" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 19 }} />
+      <div className="glass-card notification-drawer" style={{ position: 'absolute', right: 0, top: '46px', width: '360px', maxHeight: '440px', overflow: 'auto', zIndex: 20, padding: 0 }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <strong style={{ fontSize: '14px' }}>Notifications</strong>
+          <button onClick={onMarkAll} title="Mark all read" style={{ background: 'transparent', border: 0, color: 'var(--accent-blue)', cursor: 'pointer' }}><CheckCheck size={17} /></button>
         </div>
-      )) : <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</div>}
-    </div>
+        {rows.length ? rows.map((row) => (
+          <div key={row.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', background: row.read_at ? 'transparent' : 'rgba(59,130,246,0.06)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600 }}>{row.title}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{row.message}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : ''}</div>
+          </div>
+        )) : <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</div>}
+      </div>
+    </>
   );
 }
 

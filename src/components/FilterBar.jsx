@@ -12,8 +12,8 @@ export default function FilterBar({ filters = [], onChange, onClear }) {
   const hasActive = filters.some((f) => f.value);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
-      <Filter size={14} color="var(--text-muted)" />
+    <div className="filter-bar" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+      <Filter size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
       {filters.map((filter) => (
         <div key={filter.key} style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {filter.options.map((opt) => {
@@ -44,7 +44,7 @@ export default function FilterBar({ filters = [], onChange, onClear }) {
       {hasActive && (
         <button
           onClick={onClear}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', flexShrink: 0 }}
         >
           <X size={12} /> Clear
         </button>
