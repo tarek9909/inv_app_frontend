@@ -11,7 +11,6 @@ import { toast } from '../../components/Toast.jsx';
 import { accountantStores, inventoryStores, authStore, settingsStore } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
 import { createStockRequestDraft, calculateStockRequestTotals, REQUEST_TYPES, PAYMENT_METHODS, todayIsoDate } from '../../domain/index.js';
-import { qzPrintService } from '../../services/qzPrintService.js';
 
 const editableStatuses = ['draft', 'pending'];
 
@@ -55,7 +54,6 @@ export default function StockRequestsTab() {
   const [editSaving, setEditSaving] = useState(false);
   const [printModal, setPrintModal] = useState(null);
   const [printing, setPrinting] = useState(false);
-  const [printerName, setPrinterName] = useState('');
   const [printStatus, setPrintStatus] = useState('');
   const [completeModal, setCompleteModal] = useState(null);
   const [completePayment, setCompletePayment] = useState({ payment_amount: '', payment_method: 'cash', payment_date: todayIsoDate(), payment_notes: '' });
@@ -73,10 +71,6 @@ export default function StockRequestsTab() {
     settingsStore.load().catch(() => {});
   }, []);
 
-  useEffect(() => {
-    setPrinterName(settings.qz_default_printer || '');
-  }, [settings.qz_default_printer]);
-
   const can = (permission) => user?.role?.code === 'admin' || (user?.permissions || []).includes(permission);
   const canComplete = (row) => {
     if (row.request_status !== 'approved') return false;
@@ -86,7 +80,7 @@ export default function StockRequestsTab() {
   };
   const canCancel = (row) => !['completed', 'cancelled'].includes(row.request_status);
   const canAccept = (row) => ['draft', 'pending'].includes(row.request_status);
-  const printEnabled = ['print', 'both'].includes(settings.accepted_request_fulfillment_mode || 'both') && settings.qz_tray_enabled !== 'false';
+  const printEnabled = ['print', 'both'].includes(settings.accepted_request_fulfillment_mode || 'both');
   const canPrint = (row) => printEnabled && ['approved', 'completed'].includes(row.request_status);
 
   const handleSearch = (value) => {
@@ -197,13 +191,17 @@ export default function StockRequestsTab() {
 
   const handlePrint = async () => {
     if (!printModal) return;
-    setPrinting(true); setPrintStatus('Connecting to QZ Tray...');
+    setPrinting(true); setPrintStatus('Opening print preview...');
     try {
-      const result = await qzPrintService.printRequest({ request: printModal, printerName });
-      await accountantStores.stockRequests.print(printModal.id, { printer_name: result.printer, qz_version: result.qzVersion, status: 'success' });
-      setPrintStatus(`Printed on ${result.printer}`); toast.success('Order printed');
+      const printWindow = window.open('', '_blank', 'width=840,height=900');
+      if (!printWindow) { toast.error('Please allow popups to print'); setPrinting(false); setPrintStatus(''); return; }
+      printWindow.document.write(buildPrintHtml(printModal));
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); }, 300);
+      await accountantStores.stockRequests.print(printModal.id, { printer_name: 'browser', status: 'success' }).catch(() => {});
+      setPrintStatus('Print dialog opened'); toast.success('Print dialog opened');
     } catch (err) {
-      await accountantStores.stockRequests.print(printModal.id, { printer_name: printerName, status: 'failed', error_message: err?.message || 'Print failed' }).catch(() => {});
       setPrintStatus(err?.message || 'Print failed'); toast.error(err?.message || 'Print failed');
     } finally { setPrinting(false); }
   };
@@ -387,11 +385,10 @@ export default function StockRequestsTab() {
       </Modal>
 
       {/* Print Modal */}
-      <Modal open={!!printModal} title={`Print ${printModal?.request_number || ''}`} onClose={() => setPrintModal(null)} width="520px">
-        <FormField label="Printer Name"><FormInput value={printerName} onChange={setPrinterName} placeholder="Leave empty for default printer" /></FormField>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>QZ Tray will verify the local print service and use signed backend requests before printing.</div>
+      <Modal open={!!printModal} title={`Print ${printModal?.request_number || ''}`} onClose={() => setPrintModal(null)} width="420px">
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>This will open a print preview in a new window. Use your browser's print dialog to select a printer.</p>
         {printStatus && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>{printStatus}</div>}
-        <button className="glass-button" disabled={printing} onClick={handlePrint} style={{ width: '100%' }}><Printer size={16} /> {printing ? 'Printing...' : 'Print Order'}</button>
+        <button className="glass-button" disabled={printing} onClick={handlePrint} style={{ width: '100%' }}><Printer size={16} /> {printing ? 'Opening...' : 'Print Order'}</button>
       </Modal>
     </>
   );
@@ -517,4 +514,43 @@ function DetailInfo({ label, value }) {
       <div style={{ fontSize: '14px' }}>{value}</div>
     </div>
   );
+}
+
+function buildPrintHtml(request) {
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+  const money = (v) => `$${Number(v || 0).toFixed(2)}`;
+  const rows = (request.items || []).map((line) => `<tr><td>${esc(line.item?.name || 'Item #' + line.item_id)}</td><td>${esc(line.quantity)}</td><td>${money(line.unit_price)}</td><td>${money(Number(line.quantity || 0) * Number(line.unit_price || 0))}</td></tr>`).join('');
+  return `<!DOCTYPE html><html><head><title>Order ${esc(request.request_number)}</title><style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1a1a2e; font-size: 13px; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .meta { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px; margin: 24px 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { background: #f8fafc; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+    .totals { margin-left: auto; width: 260px; }
+    .total-row { display: flex; justify-content: space-between; padding: 6px 0; }
+    .total-row.final { font-weight: 700; font-size: 15px; border-top: 2px solid #e2e8f0; padding-top: 10px; margin-top: 6px; }
+    .signature { margin-top: 48px; }
+    @media print { body { padding: 20px; } }
+  </style></head><body>
+    <h1>Stock Request Order</h1>
+    <div class="meta">${esc(request.request_number)} • ${esc(request.request_type?.replace(/_/g, ' '))} • ${new Date().toLocaleDateString()}</div>
+    <div class="grid">
+      <div><strong>Driver:</strong> ${esc(request.driver?.full_name || '-')}</div>
+      <div><strong>Date:</strong> ${esc(request.request_date || '-')}</div>
+      <div><strong>Status:</strong> ${esc(request.request_status || '-')}</div>
+      <div><strong>Payment:</strong> ${esc(request.payment_status || '-')}</div>
+    </div>
+    <table><thead><tr><th>Item</th><th>Quantity</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="totals">
+      <div class="total-row"><span>Subtotal</span><strong>${money(request.subtotal)}</strong></div>
+      <div class="total-row"><span>Discount</span><strong>${money(request.discount_amount)}</strong></div>
+      <div class="total-row final"><span>Total</span><strong>${money(request.total_amount)}</strong></div>
+      <div class="total-row"><span>Paid</span><strong>${money(request.paid_amount)}</strong></div>
+      <div class="total-row"><span>Remaining</span><strong>${money(request.remaining_amount)}</strong></div>
+    </div>
+    <div class="signature">Warehouse manager signature: ____________________________</div>
+  </body></html>`;
 }

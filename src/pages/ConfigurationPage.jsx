@@ -1,23 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Printer, Save, Wifi, Percent, Settings, CheckCircle, XCircle, Zap, Monitor } from 'lucide-react';
+import { Save, Percent, Settings, Monitor } from 'lucide-react';
 import TabBar from '../components/TabBar.jsx';
 import FormField, { FormInput, FormSelect, SubmitButton } from '../components/FormField.jsx';
 import { toast } from '../components/Toast.jsx';
 import { settingsStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
-import { qzPrintService } from '../services/qzPrintService.js';
 
 const TABS = [
   { key: 'fulfillment', label: 'Fulfillment' },
-  { key: 'printing', label: 'Printing' },
   { key: 'commissions', label: 'Commissions' }
 ];
 
 export default function ConfigurationPage() {
   const { settings, loading, saving } = useStore(settingsStore);
   const [form, setForm] = useState({});
-  const [qzStatus, setQzStatus] = useState(null);
   const [activeTab, setActiveTab] = useState('fulfillment');
 
   useEffect(() => { settingsStore.load().then((r) => setForm(r.data || {})).catch(() => {}); }, []);
@@ -27,12 +24,6 @@ export default function ConfigurationPage() {
     e.preventDefault();
     try { await settingsStore.update(form); toast.success('Configuration saved'); }
     catch (err) { toast.error(err?.message || 'Failed to save'); }
-  };
-
-  const testQz = async () => {
-    setQzStatus('checking');
-    try { const r = await qzPrintService.testConnection(); setQzStatus({ ok: true, message: `Connected${r.defaultPrinter ? ` — ${r.defaultPrinter}` : ''}` }); }
-    catch (err) { setQzStatus({ ok: false, message: err?.message || 'QZ Tray unavailable' }); }
   };
 
   if (loading && !Object.keys(form).length) {
@@ -49,7 +40,7 @@ export default function ConfigurationPage() {
           </div>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: '700' }}>System Configuration</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Manage workflows, printing, and commissions</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Manage workflows and commissions</p>
           </div>
         </div>
       </motion.div>
@@ -67,29 +58,6 @@ export default function ConfigurationPage() {
                 <SettingRow label="Accepted Request Handling" description="Choose the method for fulfilling approved stock requests">
                   <FormSelect value={form.accepted_request_fulfillment_mode || 'both'} onChange={(v) => setForm({ ...form, accepted_request_fulfillment_mode: v })} options={[{ value: 'print', label: 'Print order only' }, { value: 'driver_portal', label: 'Driver portal only' }, { value: 'both', label: 'Print + Driver portal' }]} />
                 </SettingRow>
-                <Divider />
-                <SubmitButton loading={saving}><Save size={16} /> Save</SubmitButton>
-              </form>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'printing' && (
-          <>
-            <SectionHeader icon={Printer} color="var(--accent-orange)" title="Print Service (QZ Tray)" subtitle="Local printing for order receipts" />
-            <div style={{ padding: '24px' }}>
-              <form onSubmit={handleSubmit}>
-                <SettingRow label="QZ Tray Integration" description="Enable or disable the print service">
-                  <ToggleSwitch value={form.qz_tray_enabled !== 'false'} onChange={(v) => setForm({ ...form, qz_tray_enabled: v ? 'true' : 'false' })} />
-                </SettingRow>
-                {form.qz_tray_enabled !== 'false' && (
-                  <>
-                    <SettingRow label="Default Printer" description="Leave empty for system default">
-                      <FormInput value={form.qz_default_printer || ''} onChange={(v) => setForm({ ...form, qz_default_printer: v })} placeholder="Auto-detect" />
-                    </SettingRow>
-                    <ConnectionStatus status={qzStatus} onTest={testQz} />
-                  </>
-                )}
                 <Divider />
                 <SubmitButton loading={saving}><Save size={16} /> Save</SubmitButton>
               </form>
@@ -133,24 +101,6 @@ function SectionHeader({ icon: Icon, color, title, subtitle }) {
         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: `color-mix(in srgb, ${color} 12%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon size={18} color={color} /></div>
         <div><h2 style={{ fontSize: '16px', fontWeight: '600' }}>{title}</h2><p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{subtitle}</p></div>
       </div>
-    </div>
-  );
-}
-
-function ConnectionStatus({ status, onTest }) {
-  return (
-    <div style={{ padding: '14px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <Wifi size={16} color="var(--text-muted)" />
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: '500' }}>Connection Status</div>
-          {status === 'checking' ? <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Checking...</span>
-            : status?.ok === true ? <span style={{ fontSize: '12px', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle size={12} /> {status.message}</span>
-            : status?.ok === false ? <span style={{ fontSize: '12px', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={12} /> {status.message}</span>
-            : <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Not tested</span>}
-        </div>
-      </div>
-      <button type="button" onClick={onTest} disabled={status === 'checking'} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--accent-blue)', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}><Zap size={13} /> Test</button>
     </div>
   );
 }
