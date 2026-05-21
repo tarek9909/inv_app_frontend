@@ -17,6 +17,7 @@ const TABS = [
   { key: 'driver-kpis', label: 'Driver KPIs' },
   { key: 'inventory', label: 'Inventory' },
   { key: 'balances', label: 'Balances' },
+  { key: 'aging', label: 'Aging' },
   { key: 'missing', label: 'Missing Payments' },
   { key: 'commissions', label: 'Commissions' },
   { key: 'payments', label: 'Payments' },
@@ -25,7 +26,7 @@ const TABS = [
 
 export default function ReportsPage() {
   const state = useStore(reportStore);
-  const { inventorySummary, driverBalances, paymentSummary, missingPayments, purchaseSummary, commissionSummary, targetKpis, driverPayroll, driverDetailReports, driverDetailReport, loadingByKey = {}, error } = state;
+  const { inventorySummary, driverBalances, paymentSummary, missingPayments, purchaseSummary, commissionSummary, targetKpis, driverPayroll, driverDetailReports, driverDetailReport, driverAging, loadingByKey = {}, error } = state;
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -43,6 +44,7 @@ export default function ReportsPage() {
   }, [paymentSummary, startDate, endDate]);
 
   const loadAll = (month = reportMonth) => {
+    const dateParams = { start_date: startDate, end_date: endDate };
     reportStore.loadInventorySummary().catch(() => {});
     reportStore.loadDriverBalances().catch(() => {});
     reportStore.loadPaymentSummary().catch(() => {});
@@ -52,9 +54,10 @@ export default function ReportsPage() {
     reportStore.loadTargetKpis({ month }).catch(() => {});
     reportStore.loadDriverPayroll({ month }).catch(() => {});
     reportStore.loadDriverDetailReports({ month }).catch(() => {});
+    reportStore.loadDriverAging(dateParams).catch(() => {});
   };
 
-  useEffect(() => { loadAll(reportMonth); }, [reportMonth]);
+  useEffect(() => { loadAll(reportMonth); }, [reportMonth, startDate, endDate]);
   useEffect(() => {
     if (!selectedDriverId) { reportStore.clearDriverDetailReport(); return; }
     reportStore.loadDriverDetailReport(selectedDriverId, { month: reportMonth }).catch(() => {});
@@ -111,7 +114,8 @@ export default function ReportsPage() {
       targetKpis,
       driverPayroll,
       driverDetailReports,
-      driverDetailReport
+      driverDetailReport,
+      driverAging
     }).filter((section) => scope === 'full' || section.key === activeTab);
     const tabLabel = TABS.find((t) => t.key === activeTab)?.label || 'Report';
     openReportPdfWindow({
@@ -136,6 +140,7 @@ export default function ReportsPage() {
       'driver-kpis': '/reports/target-kpis',
       payroll: '/reports/driver-payroll',
       drivers: selectedDriverId ? `/reports/drivers/${selectedDriverId}/statement` : '/reports/driver-statements',
+      aging: '/reports/driver-aging',
       missing: '/reports/missing-payments'
     };
     const endpoint = endpoints[activeTab] || '/reports/inventory-summary';
@@ -235,6 +240,7 @@ export default function ReportsPage() {
         {activeTab === 'driver-kpis' && <DriverKpisTab data={targetKpis} loading={loadingByKey.targetKpis && !targetKpis} />}
         {activeTab === 'inventory' && <InventoryTab data={inventorySummary} loading={loadingByKey.inventorySummary && !inventorySummary} />}
         {activeTab === 'balances' && <BalancesTab data={driverBalances} loading={loadingByKey.driverBalances && !driverBalances} />}
+        {activeTab === 'aging' && <AgingTab data={driverAging} loading={loadingByKey.driverAging && !driverAging} />}
         {activeTab === 'missing' && <MissingTab data={missingPayments} loading={loadingByKey.missingPayments && !missingPayments} />}
         {activeTab === 'commissions' && <CommissionsTab data={commissionSummary} loading={loadingByKey.commissionSummary && !commissionSummary} />}
         {activeTab === 'payments' && <PaymentSummaryTab data={filteredPayments} loading={loadingByKey.paymentSummary && !paymentSummary} startDate={startDate} endDate={endDate} />}
@@ -490,6 +496,50 @@ function BalancesTab({ data, loading }) {
   );
 }
 
+function AgingTab({ data, loading }) {
+  const rows = Array.isArray(data) ? data : [];
+  const pagination = useClientPagination(rows, 15);
+  const totals = useMemo(() => ({
+    current: sumBy(rows, 'current'),
+    overdue_1_7: sumBy(rows, 'overdue_1_7'),
+    overdue_8_30: sumBy(rows, 'overdue_8_30'),
+    overdue_31_plus: sumBy(rows, 'overdue_31_plus'),
+    total: sumBy(rows, 'total')
+  }), [rows]);
+
+  return (
+    <ReportSection title="Driver Aging" icon={AlertTriangle} loading={loading} summary={rows.length > 0 && (
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <SummaryChip label="Outstanding" value={`$${money(totals.total)}`} color="var(--accent-orange)" />
+        <SummaryChip label="31+ Days" value={`$${money(totals.overdue_31_plus)}`} color="var(--accent-red)" />
+      </div>
+    )}>
+      {pagination.items.length ? (
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr>{['Driver', 'Current', '1-7 Days', '8-30 Days', '31+ Days', 'Total'].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
+              <tbody>
+                {pagination.items.map((row) => (
+                  <tr key={row.driver_id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    <Td bold>{row.driver_name}</Td>
+                    <Td>${money(row.current)}</Td>
+                    <Td>${money(row.overdue_1_7)}</Td>
+                    <Td>${money(row.overdue_8_30)}</Td>
+                    <Td color={Number(row.overdue_31_plus || 0) > 0 ? 'var(--accent-red)' : undefined}>${money(row.overdue_31_plus)}</Td>
+                    <Td bold color={Number(row.total || 0) > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'}>${money(row.total)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={pagination.page} pages={pagination.pages} total={pagination.total} onPageChange={pagination.setPage} label="drivers" />
+        </>
+      ) : <EmptyState />}
+    </ReportSection>
+  );
+}
+
 function MissingTab({ data, loading }) {
   const rows = data?.rows || [];
   const pagination = useClientPagination(rows, 15);
@@ -611,6 +661,7 @@ function buildReportPdfSections(data) {
   const commissionRows = data.commissionSummary?.rows || [];
   const payrollRows = data.driverPayroll?.rows || [];
   const driverRows = data.driverDetailReports?.rows || [];
+  const agingRows = Array.isArray(data.driverAging) ? data.driverAging : [];
   const locationKpiRows = data.targetKpis?.locationRows || [];
   const driverKpiRows = data.targetKpis?.driverRows || [];
 
@@ -654,6 +705,12 @@ function buildReportPdfSections(data) {
       title: 'Driver Balances',
       summary: [['Drivers', balanceRows.length], ['Outstanding', `$${money(balanceRows.reduce((sum, row) => sum + Number(row.balance || row.remaining_amount || 0), 0))}`]],
       tables: [pdfTable(['Driver', 'Phone', 'Status', 'Balance'], balanceRows.map((row) => [row.full_name, row.phone || '-', row.status || '-', `$${money(row.balance || row.remaining_amount)}`]))]
+    },
+    {
+      key: 'aging',
+      title: 'Driver Aging',
+      summary: [['Drivers', agingRows.length], ['Current', `$${money(sumBy(agingRows, 'current'))}`], ['1-7 Days', `$${money(sumBy(agingRows, 'overdue_1_7'))}`], ['8-30 Days', `$${money(sumBy(agingRows, 'overdue_8_30'))}`], ['31+ Days', `$${money(sumBy(agingRows, 'overdue_31_plus'))}`], ['Total', `$${money(sumBy(agingRows, 'total'))}`]],
+      tables: [pdfTable(['Driver', 'Current', '1-7 Days', '8-30 Days', '31+ Days', 'Total'], agingRows.map((row) => [row.driver_name, `$${money(row.current)}`, `$${money(row.overdue_1_7)}`, `$${money(row.overdue_8_30)}`, `$${money(row.overdue_31_plus)}`, `$${money(row.total)}`]))]
     },
     {
       key: 'missing',

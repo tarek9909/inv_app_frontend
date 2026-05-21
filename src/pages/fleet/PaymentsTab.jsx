@@ -38,7 +38,7 @@ export default function PaymentsTab() {
 
   useEffect(() => {
     accountantStores.payments.load();
-    accountantStores.stockRequests.load({ limit: 200 });
+    accountantStores.stockRequests.load({ request_status: 'completed', limit: 200 });
   }, []);
 
   const handleSearch = (value) => {
@@ -78,7 +78,12 @@ export default function PaymentsTab() {
   }, [detailModal, rows, requestState.rows]);
 
   const openCreate = () => { setForm({ stock_request_id: '', amount: '', payment_method: 'cash', payment_date: todayIsoDate(), notes: '' }); setModalOpen(true); };
-  const payableRequests = (requestState.rows || []).filter((r) => r.payment_status !== 'cancelled' && Number(r.remaining_amount || 0) > 0);
+  const payableRequests = (requestState.rows || []).filter((r) => (
+    r.request_type === 'stock_out'
+    && r.request_status === 'completed'
+    && r.payment_status !== 'cancelled'
+    && Number(r.remaining_amount || 0) > 0
+  ));
   const selectedRequest = payableRequests.find((r) => String(r.id) === String(form.stock_request_id));
   const requestOptions = payableRequests.map((r) => ({ value: r.id, label: `${r.request_number} - ${r.driver?.full_name || 'Unknown'} (${money(r.remaining_amount)} due)` }));
   const canCreatePayment = user?.role?.code === 'admin' || (user?.permissions || []).includes('payments.create');
@@ -94,7 +99,7 @@ export default function PaymentsTab() {
       setVoidReason('');
       setDetailModal(null);
       accountantStores.payments.load();
-      accountantStores.stockRequests.load({ limit: 200 });
+      accountantStores.stockRequests.load({ request_status: 'completed', limit: 200 });
     } catch (err) {
       toast.error(err?.message || 'Failed to void payment');
     } finally {
@@ -112,7 +117,7 @@ export default function PaymentsTab() {
       toast.success('Payment recorded');
       setModalOpen(false);
       accountantStores.payments.load();
-      accountantStores.stockRequests.load({ limit: 200 });
+      accountantStores.stockRequests.load({ request_status: 'completed', limit: 200 });
     } catch (err) { toast.error(err?.message || 'Failed to record payment'); }
     finally { setSaving(false); }
   };

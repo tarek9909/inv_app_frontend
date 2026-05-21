@@ -31,7 +31,7 @@ export default function SuppliersTab() {
   const handleSearch = (v) => { setSearch(v); clearTimeout(searchTimeout); setSearchTimeout(setTimeout(() => inventoryStores.suppliers.load({ search: v, page: 1 }), 300)); };
 
   const filteredRows = useMemo(() => { if (!statusFilter) return rows; return rows.filter((r) => r.status === statusFilter); }, [rows, statusFilter]);
-  const pagination = useClientPagination(filteredRows, 12);
+  const pagination = useClientPagination(filteredRows, 18);
 
   const openCreate = () => { setEditing(null); setForm({ name: '', phone: '', email: '', address: '', notes: '', status: 'active' }); setErrors({}); setModalOpen(true); };
   const openEdit = (row) => { setEditing(row); setForm({ name: row.name || '', phone: row.phone || '', email: row.email || '', address: row.address || '', notes: row.notes || '', status: row.status || 'active' }); setErrors({}); setModalOpen(true); };
@@ -73,23 +73,23 @@ export default function SuppliersTab() {
       {loading ? <GridSkeleton /> : error ? <ErrorState onRetry={() => inventoryStores.suppliers.load()} message={error?.message} /> : pagination.items.length === 0 ? (
         <EmptyState message={filteredRows.length === 0 && rows.length > 0 ? 'No suppliers match the filter' : 'No suppliers found'} />
       ) : (
-        <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+        <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
           <AnimatePresence>
             {pagination.items.map((sup, idx) => (
-              <motion.div key={sup.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: idx * 0.03, duration: 0.25 }} className="glass-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', aspectRatio: '1' }}>
-                <div style={{ padding: '18px 20px 14px', background: sup.status === 'active' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(100, 100, 100, 0.04) 100%)', borderBottom: '1px solid var(--glass-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.15))', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700', color: 'var(--accent-green)', flexShrink: 0 }}>
+              <motion.div key={sup.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: idx * 0.03, duration: 0.25 }} className="glass-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '148px' }}>
+                <div style={{ padding: '12px 14px 10px', background: sup.status === 'active' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(100, 100, 100, 0.04) 100%)', borderBottom: '1px solid var(--glass-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.15))', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--accent-green)', flexShrink: 0 }}>
                       {sup.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sup.name}</h3>
+                      <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sup.name}</h3>
                       <StatusBadge status={sup.status} />
                     </div>
                   </div>
                 </div>
-                <div style={{ padding: '16px 20px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                     {sup.phone && <InfoRow icon={Phone} value={sup.phone} />}
                     {sup.email && <InfoRow icon={Mail} value={sup.email} />}
                     {!sup.phone && !sup.email && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No contact info</span>}
@@ -124,8 +124,8 @@ export default function SuppliersTab() {
   );
 }
 
-function InfoRow({ icon: Icon, value }) { return (<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon size={13} color="var(--text-muted)" /><span style={{ fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span></div>); }
-function CardAction({ icon: Icon, label, onClick, color }) { return (<button onClick={onClick} title={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', color, padding: '7px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: '500', transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.transform = 'translateY(0)'; }}><Icon size={13} /><span>{label}</span></button>); }
-function GridSkeleton() { return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>{Array.from({ length: 6 }).map((_, i) => <div key={i} className="glass-card" style={{ padding: '24px', aspectRatio: '1' }}><div style={{ height: '16px', width: '60%', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', animation: 'pulse 1.5s infinite' }} /></div>)}</div>); }
+function InfoRow({ icon: Icon, value }) { return (<div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}><Icon size={12} color="var(--text-muted)" /><span style={{ fontSize: '12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span></div>); }
+function CardAction({ icon: Icon, label, onClick, color }) { return (<button onClick={onClick} title={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', color, padding: '6px 9px', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '500', transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.transform = 'translateY(0)'; }}><Icon size={12} /><span>{label}</span></button>); }
+function GridSkeleton() { return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>{Array.from({ length: 8 }).map((_, i) => <div key={i} className="glass-card" style={{ padding: '14px', minHeight: '148px' }}><div style={{ height: '16px', width: '60%', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', animation: 'pulse 1.5s infinite' }} /></div>)}</div>); }
 function ErrorState({ onRetry, message }) { return (<div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}><AlertCircle size={32} color="var(--accent-red)" style={{ marginBottom: '12px' }} /><p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>{message || 'Failed to load'}</p><button onClick={onRetry} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Retry</button></div>); }
 function EmptyState({ message }) { return (<div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}><Truck size={32} color="var(--text-muted)" style={{ marginBottom: '12px' }} /><p style={{ color: 'var(--text-muted)' }}>{message}</p></div>); }

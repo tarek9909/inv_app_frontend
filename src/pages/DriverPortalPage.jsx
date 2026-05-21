@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CheckSquare, Eye, Printer } from 'lucide-react';
 import DataTable, { ActionButton, StatusBadge } from '../components/DataTable.jsx';
 import Modal from '../components/Modal.jsx';
@@ -37,10 +37,14 @@ const adminColumns = [
   ...columns
 ];
 
+const activeStatuses = ['draft', 'pending', 'approved'];
+const historyStatuses = ['completed', 'cancelled'];
+
 export default function DriverPortalPage() {
   const { user } = useStore(authStore);
   const { driver, rows, loading, error } = useStore(driverStore);
   const [detail, setDetail] = useState(null);
+  const [view, setView] = useState('active');
   const isAdmin = user?.role?.code === 'admin';
 
   useEffect(() => {
@@ -59,22 +63,34 @@ export default function DriverPortalPage() {
     }
   };
 
+  const { activeRows, historyRows } = useMemo(() => ({
+    activeRows: rows.filter((row) => activeStatuses.includes(row.request_status)),
+    historyRows: rows.filter((row) => historyStatuses.includes(row.request_status))
+  }), [rows]);
+  const visibleRows = view === 'history' ? historyRows : activeRows;
+
   return (
     <>
       <div style={{ marginBottom: '16px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>{isAdmin ? 'All Driver Orders' : driver?.full_name || 'Driver Orders'}</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-          {isAdmin ? 'All stock requests across drivers.' : 'Accepted and completed orders assigned to your account.'}
+          {isAdmin ? 'Current and historical stock requests across drivers.' : 'Active orders and completed history assigned to your account.'}
         </p>
       </div>
+      <PortalViewSwitch
+        value={view}
+        onChange={setView}
+        activeCount={activeRows.length}
+        historyCount={historyRows.length}
+      />
       <DataTable
         columns={isAdmin ? adminColumns : columns}
-        rows={rows}
-        meta={{ total: rows.length, page: 1, pages: 1 }}
+        rows={visibleRows}
+        meta={{ total: visibleRows.length, page: 1, pages: 1 }}
         loading={loading}
         error={error}
         onLoad={() => driverStore.loadRequests()}
-        emptyMessage="No accepted orders yet"
+        emptyMessage={view === 'history' ? 'No order history yet' : 'No active orders now'}
         actions={(row) => <ActionButton icon={Eye} label="View" onClick={() => openDetail(row)} />}
       />
       <Modal open={!!detail} title={`Order ${detail?.request_number || ''}`} onClose={() => setDetail(null)} width="720px">
@@ -84,6 +100,43 @@ export default function DriverPortalPage() {
         }} />}
       </Modal>
     </>
+  );
+}
+
+function PortalViewSwitch({ value, onChange, activeCount, historyCount }) {
+  const options = [
+    { key: 'active', label: 'Active Now', count: activeCount },
+    { key: 'history', label: 'History', count: historyCount }
+  ];
+  return (
+    <div style={{ display: 'inline-flex', gap: '4px', padding: '4px', border: '1px solid var(--glass-border)', borderRadius: '10px', background: 'var(--surface-subtle)', marginBottom: '16px' }}>
+      {options.map((option) => {
+        const selected = value === option.key;
+        return (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onChange(option.key)}
+            style={{
+              border: selected ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid transparent',
+              background: selected ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+              color: selected ? 'var(--text-primary)' : 'var(--text-secondary)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              fontWeight: selected ? 600 : 500
+            }}
+          >
+            <span>{option.label}</span>
+            <span style={{ color: selected ? 'var(--accent-blue)' : 'var(--text-muted)' }}>{option.count}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

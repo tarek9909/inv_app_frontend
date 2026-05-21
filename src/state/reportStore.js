@@ -17,6 +17,7 @@ export const createReportStore = ({ reportsApi = api.reports } = {}) => {
     driverPayroll: null,
     driverDetailReports: null,
     driverDetailReport: null,
+    driverAging: null,
     loadingByKey: {},
     loading: false,
     error: null
@@ -76,6 +77,7 @@ export const createReportStore = ({ reportsApi = api.reports } = {}) => {
     loadDriverPayroll: (params) => load('driverPayroll', () => reportsApi.driverPayroll(params), params),
     loadDriverDetailReports: (params) => load('driverDetailReports', () => reportsApi.driverDetailReports(params), params),
     loadDriverDetailReport: (id, params) => load('driverDetailReport', () => reportsApi.driverDetailReport(id, params), { id, ...params }),
+    loadDriverAging: (params) => load('driverAging', () => reportsApi.driverAging(params), params),
     clearDriverDetailReport: () => store.setState({ driverDetailReport: null }),
     clearCache: () => resultCache.clear()
   };
