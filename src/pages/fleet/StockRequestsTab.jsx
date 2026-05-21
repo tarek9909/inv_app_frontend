@@ -488,12 +488,13 @@ function StockRequestDetail({ request }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Item', 'Qty', 'Driver Confirmed', 'Unit Price', 'Total'].map((h) => (<th key={h} style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)', fontSize: '12px', borderBottom: '1px solid var(--glass-border)' }}>{h}</th>))}</tr></thead>
+          <thead><tr>{['Item', 'Qty', 'Received Qty', 'Driver Confirmed', 'Unit Price', 'Total'].map((h) => (<th key={h} style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)', fontSize: '12px', borderBottom: '1px solid var(--glass-border)' }}>{h}</th>))}</tr></thead>
           <tbody>
             {(request.items || []).map((line) => (
               <tr key={line.id}>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>{line.item?.name || `Item #${line.item_id}`}</td>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>{line.quantity}</td>
+                <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>{line.confirmation ? line.confirmation.confirmed_quantity : '-'}</td>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>{line.confirmation ? (line.confirmation.confirmed ? 'Yes' : 'No') : '-'}</td>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>${Number(line.unit_price || 0).toFixed(2)}</td>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>${(Number(line.quantity || 0) * Number(line.unit_price || 0)).toFixed(2)}</td>

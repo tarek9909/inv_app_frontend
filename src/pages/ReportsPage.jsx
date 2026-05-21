@@ -63,6 +63,7 @@ export default function ReportsPage() {
     const content = printRef.current;
     if (!content) return;
     const printWindow = window.open('', '_blank');
+    if (!sections.length) { exportPDF(); return; }
     const tabLabel = TABS.find((t) => t.key === activeTab)?.label || 'Report';
     printWindow.document.write(`<!DOCTYPE html><html><head><title>${tabLabel} - Stock Driver Report</title><style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,6 +92,36 @@ export default function ReportsPage() {
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     setTimeout(() => { printWindow.print(); }, 300);
+  };
+
+  const exportReportPDF = (scope = 'active') => {
+    const sections = buildReportPdfSections({
+      activeTab,
+      selectedDriverId,
+      reportMonth,
+      startDate,
+      endDate,
+      inventorySummary,
+      driverBalances,
+      paymentSummary: filteredPayments,
+      missingPayments,
+      purchaseSummary,
+      commissionSummary,
+      targetKpis,
+      driverPayroll,
+      driverDetailReports,
+      driverDetailReport
+    }).filter((section) => scope === 'full' || section.key === activeTab);
+    const tabLabel = TABS.find((t) => t.key === activeTab)?.label || 'Report';
+    openReportPdfWindow({
+      title: scope === 'full' ? 'Full Reports Pack' : `${tabLabel} Report`,
+      subtitle: [
+        `Period: ${reportMonth}`,
+        startDate || endDate ? `Date filter: ${startDate || 'Start'} to ${endDate || 'End'}` : '',
+        `Generated: ${new Date().toLocaleString()}`
+      ].filter(Boolean).join(' | '),
+      sections
+    });
   };
 
   const exportCSV = () => {
@@ -151,8 +182,11 @@ export default function ReportsPage() {
               <button onClick={() => setFiltersOpen(!filtersOpen)} style={{ background: filtersOpen || hasFilters ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hasFilters ? 'rgba(59, 130, 246, 0.4)' : 'var(--glass-border)'}`, color: hasFilters ? 'var(--accent-blue)' : 'var(--text-secondary)', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '500' }}>
                 <Filter size={14} /> Filters {hasFilters && '•'}
               </button>
-              <button onClick={exportPDF} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
-                <Download size={14} /> Export PDF
+              <button onClick={() => exportReportPDF('active')} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
+                <Download size={14} /> Active View PDF
+              </button>
+              <button onClick={() => exportReportPDF('full')} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
+                <Download size={14} /> Full PDF
               </button>
               <button onClick={exportCSV} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
                 <Download size={14} /> CSV
@@ -564,6 +598,165 @@ function PurchasesTab({ data, loading }) {
 }
 
 // ─── Shared Components ───────────────────────────────────────────────────────
+
+function buildReportPdfSections(data) {
+  const inventoryRows = Array.isArray(data.inventorySummary) ? data.inventorySummary : [];
+  const balanceRows = Array.isArray(data.driverBalances) ? data.driverBalances : [];
+  const paymentRows = Array.isArray(data.paymentSummary) ? data.paymentSummary : [];
+  const purchaseRows = Array.isArray(data.purchaseSummary) ? data.purchaseSummary : [];
+  const missingRows = data.missingPayments?.rows || [];
+  const commissionRows = data.commissionSummary?.rows || [];
+  const payrollRows = data.driverPayroll?.rows || [];
+  const driverRows = data.driverDetailReports?.rows || [];
+  const locationKpiRows = data.targetKpis?.locationRows || [];
+  const driverKpiRows = data.targetKpis?.driverRows || [];
+
+  return [
+    {
+      key: 'payroll',
+      title: 'Driver Monthly Payroll',
+      summary: [['Period', data.driverPayroll?.period || data.reportMonth], ['Drivers', payrollRows.length], ['Total Salary', `$${money(sumBy(payrollRows, 'salary'))}`], ['Total Commission', `$${money(sumBy(payrollRows, 'total_commission'))}`], ['Total Payout', `$${money(sumBy(payrollRows, 'total_pay'))}`]],
+      tables: [pdfTable(['Driver', 'Location', 'Salary', 'Sales', 'Orders', 'Target', 'KPI', 'Commission', 'Total Pay'], payrollRows.map((row) => [row.driver_name, row.performance_locations?.join(', ') || row.current_location_name || '-', `$${money(row.salary)}`, `$${money(row.sales_total)}`, row.order_count || 0, `$${money(row.target_amount)}`, `${cleanText(row.performance)} (${percent(row.progress_percent)})`, `$${money(row.total_commission)}`, `$${money(row.total_pay)}`]))]
+    },
+    {
+      key: 'drivers',
+      title: data.selectedDriverId && data.driverDetailReport?.report ? `${data.driverDetailReport.report.driver.full_name} Driver Detail` : 'Driver Report Overview',
+      summary: [['Period', data.driverDetailReports?.period || data.reportMonth], ['Drivers', driverRows.length], ['Net Sales', `$${money(sumNested(driverRows, ['summary', 'net_sales']))}`], ['Paid', `$${money(sumNested(driverRows, ['summary', 'paid_in_period']))}`], ['Missing', `$${money(sumNested(driverRows, ['summary', 'missing_payments']))}`]],
+      tables: buildDriverPdfTables(data.driverDetailReport?.report, driverRows)
+    },
+    {
+      key: 'location-kpis',
+      title: 'Location Target KPIs',
+      summary: [['Period', data.targetKpis?.period || data.reportMonth], ['Locations', locationKpiRows.length], ['Total Target', `$${money(sumBy(locationKpiRows, 'target_amount'))}`], ['Total Sales', `$${money(sumBy(locationKpiRows, 'sales_total'))}`]],
+      tables: [pdfTable(['Location', 'Drivers', 'Mode', 'Target', 'Sales', 'Progress', 'Variance'], locationKpiRows.map((row) => [row.location_name, row.driver_count, cleanText(row.target_mode), `$${money(row.target_amount)}`, `$${money(row.sales_total)}`, percent(row.progress_percent), `$${money(row.variance_amount)}`]))]
+    },
+    {
+      key: 'driver-kpis',
+      title: 'Driver Target KPIs',
+      summary: [['Period', data.targetKpis?.period || data.reportMonth], ['Drivers', driverKpiRows.length], ['Total Target', `$${money(sumBy(driverKpiRows, 'target_amount'))}`], ['Total Sales', `$${money(sumBy(driverKpiRows, 'sales_total'))}`]],
+      tables: [pdfTable(['Driver', 'Location', 'Target', 'Sales', 'Progress', 'Variance'], driverKpiRows.map((row) => [row.driver_name, row.location_name, `$${money(row.target_amount)}`, `$${money(row.sales_total)}`, percent(row.progress_percent), `$${money(row.variance_amount)}`]))]
+    },
+    {
+      key: 'inventory',
+      title: 'Inventory Summary',
+      summary: [['Items', inventoryRows.length], ['Low Stock', inventoryRows.filter((item) => Number(item.available_stock ?? item.current_stock ?? 0) <= Number(item.minimum_stock || 0)).length], ['Total Available', money(inventoryRows.reduce((sum, item) => sum + Number(item.available_stock ?? item.current_stock ?? 0), 0))]],
+      tables: [pdfTable(['Name', 'SKU', 'Stock', 'Reserved', 'Available', 'Min Stock', 'Status'], inventoryRows.map((item) => {
+        const available = item.available_stock ?? item.current_stock;
+        const low = Number(available || 0) <= Number(item.minimum_stock || 0);
+        return [item.name, item.sku || '-', item.current_stock, item.reserved_stock || 0, available, item.minimum_stock, low ? 'Low stock' : 'OK'];
+      }))]
+    },
+    {
+      key: 'balances',
+      title: 'Driver Balances',
+      summary: [['Drivers', balanceRows.length], ['Outstanding', `$${money(balanceRows.reduce((sum, row) => sum + Number(row.balance || row.remaining_amount || 0), 0))}`]],
+      tables: [pdfTable(['Driver', 'Phone', 'Status', 'Balance'], balanceRows.map((row) => [row.full_name, row.phone || '-', row.status || '-', `$${money(row.balance || row.remaining_amount)}`]))]
+    },
+    {
+      key: 'missing',
+      title: 'Missing Payments',
+      summary: [['Period', data.missingPayments?.period || data.reportMonth], ['Requests', missingRows.length], ['Missing Total', `$${money(data.missingPayments?.total_missing || sumBy(missingRows, 'remaining_amount'))}`]],
+      tables: [pdfTable(['Request', 'Driver', 'Completed', 'Payment Status', 'Total', 'Paid', 'Missing'], missingRows.map((row) => [row.request_number, row.driver_name, formatDate(row.completed_at), cleanText(row.payment_status), `$${money(row.total_amount)}`, `$${money(row.paid_amount)}`, `$${money(row.remaining_amount)}`]))]
+    },
+    {
+      key: 'commissions',
+      title: 'Driver Commissions',
+      summary: [['Entries', commissionRows.length], ['Total Commission', `$${money(sumBy(commissionRows, 'total_commission'))}`], ['Enabled', data.commissionSummary?.enabled === false ? 'No' : 'Yes']],
+      tables: [pdfTable(['Driver', 'Location', 'Sales', 'Target', 'Progress', 'Base', 'Bonus', 'Total'], commissionRows.map((row) => [row.driver_name, row.location_name, `$${money(row.sales_total)}`, `$${money(row.target_amount)}`, percent(row.target_progress_percent), `$${money(row.base_commission)}`, `$${money(row.bonus_commission)}`, `$${money(row.total_commission)}`]))]
+    },
+    {
+      key: 'payments',
+      title: 'Payment Summary',
+      summary: [['Rows', paymentRows.length], ['Total', `$${money(paymentRows.reduce((sum, row) => sum + Number(row.total_amount || row.amount || row.total || 0), 0))}`], ['Date Filter', data.startDate || data.endDate ? `${data.startDate || 'Start'} to ${data.endDate || 'End'}` : 'None']],
+      tables: [pdfTable(['Date', 'Total Amount'], paymentRows.map((row) => [row.date || row.payment_date || '-', `$${money(row.total_amount || row.amount || row.total)}`]))]
+    },
+    {
+      key: 'purchases',
+      title: 'Purchase Orders by Status',
+      summary: [['Statuses', purchaseRows.length], ['Total Amount', `$${money(purchaseRows.reduce((sum, row) => sum + Number(row.total_amount || row.amount || 0), 0))}`]],
+      tables: [pdfTable(['Status', 'Count', 'Amount'], purchaseRows.map((row) => [cleanText(row.status), row.count || 0, `$${money(row.total_amount || row.amount)}`]))]
+    }
+  ];
+}
+
+function buildDriverPdfTables(report, driverRows) {
+  if (!report) {
+    return [pdfTable(['Driver', 'Location', 'Requests', 'Net Sales', 'Paid', 'Missing', 'Target', 'Progress', 'Commission', 'Total Pay'], driverRows.map((row) => [row.driver?.full_name, row.driver?.current_location?.name || '-', row.summary?.request_count || 0, `$${money(row.summary?.net_sales)}`, `$${money(row.summary?.paid_in_period)}`, `$${money(row.summary?.missing_payments)}`, `$${money(row.kpi?.target_amount)}`, `${cleanText(row.kpi?.performance)} (${percent(row.kpi?.progress_percent)})`, `$${money(row.commission?.total_commission)}`, `$${money(row.payroll?.total_pay)}`]))];
+  }
+  return [
+    pdfTable(['Metric', 'Value'], [['Driver', report.driver?.full_name], ['Location', report.driver?.current_location?.name || '-'], ['Net Sales', `$${money(report.summary?.net_sales)}`], ['Paid', `$${money(report.summary?.paid_in_period)}`], ['Missing', `$${money(report.summary?.missing_payments)}`], ['Target', `$${money(report.kpi?.target_amount)}`], ['Progress', percent(report.kpi?.progress_percent)], ['Commission', `$${money(report.commission?.total_commission)}`], ['Total Pay', `$${money(report.payroll?.total_pay)}`]]),
+    pdfTable(['Request', 'Date', 'Type', 'Status', 'Total', 'Paid', 'Remaining'], (report.requests || []).map((row) => [row.request_number, row.request_date || '-', cleanText(row.request_type), cleanText(row.request_status), `$${money(row.total_amount)}`, `$${money(row.paid_amount)}`, `$${money(row.remaining_amount)}`])),
+    pdfTable(['Payment', 'Request', 'Date', 'Method', 'Amount'], (report.payments || []).map((row) => [row.payment_number, row.request_number || '-', formatDate(row.payment_date), cleanText(row.payment_method), `$${money(row.amount)}`]))
+  ];
+}
+
+function pdfTable(columns, rows) { return { columns, rows: rows || [] }; }
+
+function openReportPdfWindow({ title, subtitle, sections }) {
+  const printWindow = window.open('', '_blank', 'width=1040,height=900');
+  if (!printWindow) return;
+  printWindow.document.write(buildReportPdfHtml({ title, subtitle, sections }));
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => { printWindow.print(); }, 350);
+}
+
+function buildReportPdfHtml({ title, subtitle, sections }) {
+  return `<!doctype html><html><head><title>${escapeHtml(title)} - Stock Driver System</title><style>
+    @page { size: A4 landscape; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #111827; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.35; }
+    header { border-bottom: 2px solid #111827; padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; gap: 24px; }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 0; font-size: 16px; }
+    .subtitle { color: #475569; font-size: 11px; }
+    .brand { color: #475569; text-align: right; font-size: 11px; }
+    section { page-break-inside: avoid; margin-bottom: 22px; }
+    section + section { page-break-before: always; }
+    .section-title { border-bottom: 1px solid #cbd5e1; padding-bottom: 7px; margin-bottom: 10px; }
+    .summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .summary-card { border: 1px solid #dbe3ee; background: #f8fafc; padding: 8px 10px; border-radius: 6px; min-height: 44px; }
+    .summary-label { color: #64748b; font-size: 9px; text-transform: uppercase; margin-bottom: 4px; }
+    .summary-value { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    th { background: #eef2f7; color: #334155; text-align: left; text-transform: uppercase; font-size: 9px; padding: 7px 8px; border: 1px solid #d9e2ec; }
+    td { padding: 7px 8px; border: 1px solid #e5e7eb; vertical-align: top; overflow-wrap: anywhere; }
+    tbody tr:nth-child(even) td { background: #fbfdff; }
+    .empty { color: #64748b; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 6px; }
+    footer { position: fixed; bottom: 0; left: 0; right: 0; color: #94a3b8; font-size: 9px; display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+    @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+  </style></head><body><header><div><h1>${escapeHtml(title)}</h1><div class="subtitle">${escapeHtml(subtitle)}</div></div><div class="brand"><strong>Stock Driver System</strong><br />Structured report export</div></header>${sections.map(reportSectionHtml).join('')}<footer><span>Stock Driver System</span><span>${escapeHtml(new Date().toLocaleString())}</span></footer></body></html>`;
+}
+
+function reportSectionHtml(section) {
+  return `<section><div class="section-title"><h2>${escapeHtml(section.title)}</h2></div>${summaryHtml(section.summary)}${section.tables.map(tableHtml).join('')}</section>`;
+}
+
+function summaryHtml(summary = []) {
+  if (!summary.length) return '';
+  return `<div class="summary">${summary.map(([label, value]) => `<div class="summary-card"><div class="summary-label">${escapeHtml(label)}</div><div class="summary-value">${escapeHtml(value ?? '-')}</div></div>`).join('')}</div>`;
+}
+
+function tableHtml(table) {
+  if (!table.rows.length) return '<div class="empty">No records available</div>';
+  return `<table><thead><tr>${table.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${table.rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell ?? '-')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function sumBy(rows, key) { return (rows || []).reduce((sum, row) => sum + Number(row?.[key] || 0), 0); }
+
+function sumNested(rows, path) {
+  return (rows || []).reduce((sum, row) => {
+    let value = row;
+    path.forEach((key) => { value = value?.[key]; });
+    return sum + Number(value || 0);
+  }, 0);
+}
+
+function cleanText(value) { return String(value || '-').replace(/_/g, ' '); }
+function formatDate(value) { return value ? new Date(value).toLocaleDateString() : '-'; }
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+}
 
 function ReportSection({ title, icon: Icon, loading, children, summary, style = {} }) {
   return (

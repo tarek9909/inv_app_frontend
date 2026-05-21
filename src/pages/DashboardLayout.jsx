@@ -99,10 +99,10 @@ export default function DashboardLayout() {
       {/* Sidebar */}
       <aside
         className={`glass-panel dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}
-        style={{ width: '280px', display: 'flex', flexDirection: 'column', padding: '0' }}
+        style={{ width: '280px', display: 'flex', flexDirection: 'column', padding: '0', position: 'sticky', top: '20px', height: 'calc(100vh - 40px)', overflow: 'hidden', flexShrink: 0 }}
       >
         {/* Sidebar Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 24px 0 24px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 24px 0 24px', marginBottom: '24px', flexShrink: 0 }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={20} color="white" />
           </div>
@@ -120,8 +120,8 @@ export default function DashboardLayout() {
           </button>
         </div>
 
-        {/* Scrollable Nav */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', padding: '0 24px', minHeight: 0 }}>
+        {/* Nav */}
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', padding: '0 24px', minHeight: 0, overflowY: 'auto' }}>
           {navItems.filter(item => canAccess(item)).map((item) => {
             const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
             return (
@@ -129,15 +129,16 @@ export default function DashboardLayout() {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '12px',
+                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderRadius: '12px',
                   cursor: 'pointer', transition: 'all 0.2s',
                   background: isActive ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
                   color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid rgba(56, 189, 248, 0.32)' : '1px solid transparent'
+                  border: isActive ? '1px solid rgba(56, 189, 248, 0.32)' : '1px solid transparent',
+                  flexShrink: 0
                 }}
               >
-                <item.icon size={20} color={isActive ? 'var(--accent-blue)' : 'currentColor'} />
-                <span style={{ fontWeight: isActive ? '500' : '400' }}>{item.label}</span>
+                <item.icon size={18} color={isActive ? 'var(--accent-blue)' : 'currentColor'} />
+                <span style={{ fontSize: '14px', fontWeight: isActive ? '500' : '400' }}>{item.label}</span>
               </div>
             );
           })}

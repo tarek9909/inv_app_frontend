@@ -4,7 +4,7 @@ export const createAdminApi = (client) => ({
     create: (payload) => client.post('/users', payload),
     update: (id, payload) => client.patch(`/users/${id}`, payload),
     setStatus: (id, status) => client.patch(`/users/${id}/status`, { status }),
-    resetPassword: (id, temporary_password) => client.post(`/users/${id}/reset-password`, { temporary_password })
+    resetPassword: (id, temporary_password, options = {}) => client.post(`/users/${id}/reset-password`, { temporary_password, ...options })
   },
   roles: {
     list: () => client.get('/roles'),

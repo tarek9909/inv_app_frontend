@@ -3,7 +3,7 @@ import { CheckSquare, Eye, Printer } from 'lucide-react';
 import DataTable, { ActionButton, StatusBadge } from '../components/DataTable.jsx';
 import Modal from '../components/Modal.jsx';
 import PremiumCheckbox from '../components/PremiumCheckbox.jsx';
-import { driverStore } from '../state/index.js';
+import { authStore, driverStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
 import { toast } from '../components/Toast.jsx';
 
@@ -32,14 +32,23 @@ const columns = [
   { key: 'remaining_amount', label: 'Remaining', render: (row) => money(row.remaining_amount) }
 ];
 
+const adminColumns = [
+  { key: 'driver', label: 'Driver', render: (row) => row.driver?.full_name || '-' },
+  ...columns
+];
+
 export default function DriverPortalPage() {
+  const { user } = useStore(authStore);
   const { driver, rows, loading, error } = useStore(driverStore);
   const [detail, setDetail] = useState(null);
+  const isAdmin = user?.role?.code === 'admin';
 
   useEffect(() => {
-    driverStore.loadMe().catch((err) => toast.error(err?.message || 'Failed to load driver profile'));
+    if (!isAdmin) {
+      driverStore.loadMe().catch((err) => toast.error(err?.message || 'Failed to load driver profile'));
+    }
     driverStore.loadRequests().catch(() => {});
-  }, []);
+  }, [isAdmin]);
 
   const openDetail = async (row) => {
     try {
@@ -53,11 +62,13 @@ export default function DriverPortalPage() {
   return (
     <>
       <div style={{ marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>{driver?.full_name || 'Driver Orders'}</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Accepted and completed orders assigned to your account.</p>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>{isAdmin ? 'All Driver Orders' : driver?.full_name || 'Driver Orders'}</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+          {isAdmin ? 'All stock requests across drivers.' : 'Accepted and completed orders assigned to your account.'}
+        </p>
       </div>
       <DataTable
-        columns={columns}
+        columns={isAdmin ? adminColumns : columns}
         rows={rows}
         meta={{ total: rows.length, page: 1, pages: 1 }}
         loading={loading}
@@ -67,7 +78,7 @@ export default function DriverPortalPage() {
         actions={(row) => <ActionButton icon={Eye} label="View" onClick={() => openDetail(row)} />}
       />
       <Modal open={!!detail} title={`Order ${detail?.request_number || ''}`} onClose={() => setDetail(null)} width="720px">
-        {detail && <DriverRequestDetail request={detail} onRequestUpdated={(request) => {
+        {detail && <DriverRequestDetail request={detail} readOnly={isAdmin} onRequestUpdated={(request) => {
           setDetail(request);
           driverStore.loadRequests().catch(() => {});
         }} />}
@@ -76,12 +87,33 @@ export default function DriverPortalPage() {
   );
 }
 
-function DriverRequestDetail({ request, onRequestUpdated }) {
+function DriverRequestDetail({ request, onRequestUpdated, readOnly = false }) {
   const [checks, setChecks] = useState(() => Object.fromEntries((request.items || []).map((line) => [line.id, Boolean(line.confirmation?.confirmed)])));
+  const [quantities, setQuantities] = useState(() => Object.fromEntries((request.items || []).map((line) => [
+    line.id,
+    line.confirmation?.confirmed_quantity ?? (line.confirmation?.confirmed ? line.quantity : '')
+  ])));
   const [notes, setNotes] = useState(request.driver_receipt_notes || '');
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [savingReceipt, setSavingReceipt] = useState(false);
   const receiptSubmitted = Boolean(request.driver_received_at);
+
+  useEffect(() => {
+    setChecks(Object.fromEntries((request.items || []).map((line) => [line.id, Boolean(line.confirmation?.confirmed)])));
+    setQuantities(Object.fromEntries((request.items || []).map((line) => [
+      line.id,
+      line.confirmation?.confirmed_quantity ?? (line.confirmation?.confirmed ? line.quantity : '')
+    ])));
+    setNotes(request.driver_receipt_notes || '');
+  }, [request]);
+
+  const setLineChecked = (line, checked) => {
+    setChecks({ ...checks, [line.id]: checked });
+    setQuantities({
+      ...quantities,
+      [line.id]: checked ? (quantities[line.id] || line.quantity) : ''
+    });
+  };
 
   const printInvoice = async () => {
     const printWindow = window.open('', '_blank', 'width=840,height=900');
@@ -91,6 +123,10 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
     }
     printWindow.document.write('<!doctype html><title>Opening invoice...</title><body>Opening invoice...</body>');
     printWindow.document.close();
+    if (readOnly) {
+      printInvoiceWindow(printWindow, request);
+      return;
+    }
     setSavingInvoice(true);
     try {
       const result = await driverStore.markInvoiceViewed(request.id);
@@ -113,7 +149,8 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
         notes,
         items: (request.items || []).map((line) => ({
           stock_request_item_id: line.id,
-          confirmed: Boolean(checks[line.id])
+          confirmed: Boolean(checks[line.id]),
+          confirmed_quantity: Boolean(checks[line.id]) ? Number(quantities[line.id] || 0) : 0
         }))
       };
       const result = await driverStore.submitReceipt(request.id, payload);
@@ -129,6 +166,7 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div className="info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+        {request.driver && <Info label="Driver" value={request.driver.full_name || `Driver #${request.driver_id}`} />}
         <Info label="Status" value={<StatusBadge status={request.request_status} />} />
         <Info label="Receipt" value={<ReceiptBadge request={request} />} />
         <Info label="Payment" value={<StatusBadge status={request.payment_status} />} />
@@ -139,16 +177,16 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
 
       <div className="driver-detail-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button type="button" className="glass-button" onClick={printInvoice} disabled={savingInvoice || request.request_status !== 'approved'}>
-          <Printer size={16} /> {savingInvoice ? 'Opening...' : request.driver_invoice_viewed_at ? 'Print Invoice Again' : 'Open Printable Invoice'}
+          <Printer size={16} /> {readOnly ? 'Print Invoice' : savingInvoice ? 'Opening...' : request.driver_invoice_viewed_at ? 'Print Invoice Again' : 'Open Printable Invoice'}
         </button>
-        {request.driver_invoice_viewed_at && <span style={{ color: 'var(--text-secondary)', fontSize: '13px', alignSelf: 'center' }}>Invoice opened</span>}
+        {!readOnly && request.driver_invoice_viewed_at && <span style={{ color: 'var(--text-secondary)', fontSize: '13px', alignSelf: 'center' }}>Invoice opened</span>}
       </div>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Received', 'Item', 'Qty', 'Unit Price', 'Total'].map((head) => (
+              {['Received', 'Received Qty', 'Item', 'Qty', 'Unit Price', 'Total'].map((head) => (
                 <th key={head} style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)', fontSize: '12px', borderBottom: '1px solid var(--glass-border)' }}>{head}</th>
               ))}
             </tr>
@@ -159,8 +197,21 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>
                   <PremiumCheckbox
                     checked={Boolean(checks[line.id])}
-                    disabled={receiptSubmitted}
-                    onChange={(v) => setChecks({ ...checks, [line.id]: v })}
+                    disabled={readOnly || receiptSubmitted}
+                    onChange={(v) => setLineChecked(line, v)}
+                  />
+                </td>
+                <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)', minWidth: '110px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    max={line.quantity}
+                    step="0.01"
+                    value={quantities[line.id] ?? ''}
+                    disabled={readOnly || receiptSubmitted || !checks[line.id]}
+                    onChange={(event) => setQuantities({ ...quantities, [line.id]: event.target.value })}
+                    className="glass-input"
+                    style={{ width: '96px', fontSize: '13px', padding: '8px 10px' }}
                   />
                 </td>
                 <td style={{ padding: '10px', borderBottom: '1px solid var(--glass-border)' }}>{line.item?.name || `Item #${line.item_id}`}</td>
@@ -176,22 +227,24 @@ function DriverRequestDetail({ request, onRequestUpdated }) {
         <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Receipt Notes</label>
         <textarea
           value={notes}
-          disabled={receiptSubmitted}
+          disabled={readOnly || receiptSubmitted}
           onChange={(event) => setNotes(event.target.value)}
           rows={3}
           placeholder="Optional notes about missing or mismatched items"
           style={{ width: '100%', resize: 'vertical', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', padding: '10px 12px' }}
         />
       </div>
-      <button
-        type="button"
-        className="glass-button"
-        onClick={submitReceipt}
-        disabled={savingReceipt || receiptSubmitted || !request.driver_invoice_viewed_at || request.request_status !== 'approved'}
-        style={{ width: '100%', justifyContent: 'center' }}
-      >
-        <CheckSquare size={16} /> {receiptSubmitted ? 'Receipt Submitted' : savingReceipt ? 'Submitting...' : 'Submit Receipt Confirmation'}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          className="glass-button"
+          onClick={submitReceipt}
+          disabled={savingReceipt || receiptSubmitted || !request.driver_invoice_viewed_at || request.request_status !== 'approved'}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          <CheckSquare size={16} /> {receiptSubmitted ? 'Receipt Submitted' : savingReceipt ? 'Submitting...' : 'Submit Receipt Confirmation'}
+        </button>
+      )}
       {request.notes && <Info label="Notes" value={request.notes} />}
     </div>
   );

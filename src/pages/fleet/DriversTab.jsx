@@ -7,7 +7,7 @@ import FilterBar from '../../components/FilterBar.jsx';
 import Pagination, { useClientPagination } from '../../components/Pagination.jsx';
 import FormField, { FormInput, FormSelect, FormTextarea, SubmitButton } from '../../components/FormField.jsx';
 import { toast } from '../../components/Toast.jsx';
-import { accountantStores, authStore } from '../../state/index.js';
+import { accountantStores, adminStores, authStore } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
 import { USER_STATUSES } from '../../domain/index.js';
 
@@ -34,7 +34,8 @@ export default function DriversTab() {
     accountantStores.locations.load({ limit: 100 }).catch(() => {});
   }, [user]);
 
-  const can = (permission) => user?.role?.code === 'admin' || (user?.permissions || []).includes(permission);
+  const isAdmin = user?.role?.code === 'admin';
+  const can = (permission) => isAdmin || (user?.permissions || []).includes(permission);
 
   const handleSearch = (value) => {
     setSearch(value);
@@ -56,7 +57,7 @@ export default function DriversTab() {
 
   const openEdit = (row) => {
     setEditing(row);
-    setForm({ location_id: row.location_id || row.current_location_id || '', phone: row.phone || '', address: row.address || '', id_number: row.id_number || '', vehicle_type: row.vehicle_type || '', vehicle_plate_number: row.vehicle_plate_number || '', monthly_salary: row.monthly_salary ?? '', notes: row.notes || '', status: row.status || 'active' });
+    setForm({ location_id: row.location_id || row.current_location_id || '', phone: row.phone || '', address: row.address || '', id_number: row.id_number || '', vehicle_type: row.vehicle_type || '', vehicle_plate_number: row.vehicle_plate_number || '', monthly_salary: row.monthly_salary ?? '', notes: row.notes || '', status: row.status || 'active', password: '' });
     setErrors({});
     setModalOpen(true);
   };
@@ -65,11 +66,22 @@ export default function DriversTab() {
     event.preventDefault();
     if (!editing) return;
 
+    const nextErrors = {};
+    if (form.password && form.password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+
     setSaving(true);
     try {
-      const payload = { ...form, location_id: form.location_id ? Number(form.location_id) : null, monthly_salary: Number(form.monthly_salary || 0) };
+      const { password, ...driverForm } = form;
+      const payload = { ...driverForm, location_id: driverForm.location_id ? Number(driverForm.location_id) : null, monthly_salary: Number(driverForm.monthly_salary || 0) };
       await accountantStores.drivers.update(editing.id, payload);
-      toast.success('Driver updated');
+      if (isAdmin && password && editing.user_id) {
+        await adminStores.users.resetPassword(editing.user_id, password, { must_change_password: false });
+      }
+      toast.success(password ? 'Driver and password updated' : 'Driver updated');
       setModalOpen(false);
       accountantStores.drivers.load();
     } catch (err) {
@@ -343,6 +355,24 @@ export default function DriversTab() {
           <FormField label="Status">
             <FormSelect value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={USER_STATUSES.map((status) => ({ value: status, label: status }))} />
           </FormField>
+          {isAdmin && editing?.user_id && (
+            <FormField label="New Login Password" error={errors.password}>
+              <FormInput
+                type="password"
+                value={form.password || ''}
+                onChange={(v) => {
+                  setForm({ ...form, password: v });
+                  if (errors.password) setErrors({ ...errors, password: null });
+                }}
+                placeholder="Leave blank to keep current password"
+              />
+            </FormField>
+          )}
+          {isAdmin && editing && !editing.user_id && (
+            <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--glass-border)', background: 'var(--surface-subtle)', color: 'var(--text-muted)', fontSize: '12px', marginBottom: '12px' }}>
+              This driver has no linked login account, so there is no password to update here.
+            </div>
+          )}
           <SubmitButton loading={saving}>Update Driver</SubmitButton>
         </form>
       </Modal>
