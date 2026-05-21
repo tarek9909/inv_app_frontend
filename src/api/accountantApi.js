@@ -40,6 +40,8 @@ export const createAccountantApi = (client) => ({
   },
   payments: {
     list: (params) => client.get('/payments', params),
-    create: (payload) => client.post('/payments', payload)
+    create: (payload) => client.post('/payments', payload),
+    void: (id, payload) => client.post(`/payments/${id}/void`, payload),
+    refund: (payload) => client.post('/payments/refund', payload)
   }
 });

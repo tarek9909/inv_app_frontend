@@ -30,7 +30,11 @@ export const createAccountantStores = ({ accountantApi = api.accountant } = {}) 
     cancel: accountantApi.stockRequests.cancel,
     print: accountantApi.stockRequests.print
   },
-  payments: createResourceStore({ api: accountantApi.payments })
+  payments: {
+    ...createResourceStore({ api: accountantApi.payments }),
+    void: accountantApi.payments.void,
+    refund: accountantApi.payments.refund
+  }
 });
 
 export const accountantStores = createAccountantStores();

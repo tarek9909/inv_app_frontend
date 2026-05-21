@@ -347,6 +347,17 @@ body {
   .table-card-view {
     display: block !important;
   }
+
+  /* Reports header responsive on tablet */
+  .reports-actions {
+    flex-wrap: wrap;
+    gap: 6px !important;
+  }
+
+  .reports-export-btn {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
 }
 
 /* Mobile (max-width: 767px) */
@@ -499,6 +510,24 @@ body {
   /* Login page */
   .login-panel {
     padding: 28px 20px !important;
+  }
+
+  /* Reports export buttons responsive */
+  .reports-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .reports-export-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    justify-content: center;
+  }
+
+  .reports-export-label {
+    display: none;
   }
 
   /* Notification drawer */

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Search, AlertCircle, RefreshCw, CreditCard, Calendar, DollarSign, Hash, Eye, User, Package, FileText, TrendingUp } from 'lucide-react';
+import { Plus, Search, AlertCircle, RefreshCw, CreditCard, Calendar, DollarSign, Hash, Eye, User, Package, FileText, TrendingUp, XCircle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StatusBadge } from '../../components/DataTable.jsx';
 import FilterBar from '../../components/FilterBar.jsx';
@@ -27,6 +27,9 @@ export default function PaymentsTab() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModal, setDetailModal] = useState(null);
+  const [voidModal, setVoidModal] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voiding, setVoiding] = useState(false);
   const [form, setForm] = useState({ stock_request_id: '', amount: '', payment_method: 'cash', payment_date: todayIsoDate(), notes: '' });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -79,6 +82,25 @@ export default function PaymentsTab() {
   const selectedRequest = payableRequests.find((r) => String(r.id) === String(form.stock_request_id));
   const requestOptions = payableRequests.map((r) => ({ value: r.id, label: `${r.request_number} - ${r.driver?.full_name || 'Unknown'} (${money(r.remaining_amount)} due)` }));
   const canCreatePayment = user?.role?.code === 'admin' || (user?.permissions || []).includes('payments.create');
+  const canVoidPayment = user?.role?.code === 'admin' || (user?.permissions || []).includes('payments.void');
+
+  const handleVoid = async () => {
+    if (!voidModal || !voidReason.trim()) return;
+    setVoiding(true);
+    try {
+      await accountantStores.payments.void(voidModal.id, { reason: voidReason });
+      toast.success('Payment voided');
+      setVoidModal(null);
+      setVoidReason('');
+      setDetailModal(null);
+      accountantStores.payments.load();
+      accountantStores.stockRequests.load({ limit: 200 });
+    } catch (err) {
+      toast.error(err?.message || 'Failed to void payment');
+    } finally {
+      setVoiding(false);
+    }
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -149,34 +171,45 @@ export default function PaymentsTab() {
       ) : (
         <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '14px' }}>
           <AnimatePresence>
-            {pagination.items.map((payment, idx) => (
+            {pagination.items.map((payment, idx) => {
+              const isVoid = Boolean(payment.is_void);
+              const isRefund = Number(payment.amount) < 0;
+              const accentColor = isVoid ? 'var(--accent-red)' : isRefund ? 'var(--accent-orange)' : methodColor(payment.payment_method);
+              return (
               <motion.div key={payment.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: idx * 0.02 }}
-                className="glass-card" style={{ padding: 0, overflow: 'hidden', cursor: 'pointer' }}
+                className="glass-card" style={{ padding: 0, overflow: 'hidden', cursor: 'pointer', opacity: isVoid ? 0.6 : 1 }}
                 onClick={() => setDetailModal(payment)}
               >
                 <div style={{ display: 'flex', height: '100%' }}>
                   {/* Left color accent */}
-                  <div style={{ width: '4px', background: methodColor(payment.payment_method), flexShrink: 0 }} />
+                  <div style={{ width: '4px', background: accentColor, flexShrink: 0 }} />
                   {/* Content */}
                   <div style={{ flex: 1, padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                     {/* Left: stacked date + method */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{payment.payment_date ? new Date(payment.payment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</div>
-                      <StatusBadge status={payment.payment_method} colorMap={{ cash: 'var(--accent-green)', bank_transfer: 'var(--accent-blue)', other: 'var(--accent-purple)' }} />
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: isVoid ? 'line-through' : 'none' }}>{payment.payment_date ? new Date(payment.payment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</div>
+                      {isVoid ? (
+                        <StatusBadge status="voided" colorMap={{ voided: 'var(--accent-red)' }} />
+                      ) : isRefund ? (
+                        <StatusBadge status="refund" colorMap={{ refund: 'var(--accent-orange)' }} />
+                      ) : (
+                        <StatusBadge status={payment.payment_method} colorMap={{ cash: 'var(--accent-green)', bank_transfer: 'var(--accent-blue)', other: 'var(--accent-purple)' }} />
+                      )}
                     </div>
                     {/* Center: driver + request */}
                     <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.stock_request?.driver?.full_name || payment.driver?.full_name || '-'}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isVoid ? 'line-through' : 'none' }}>{payment.stock_request?.driver?.full_name || payment.driver?.full_name || '-'}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.stock_request?.request_number || payment.payment_number}</div>
                     </div>
                     {/* Right: amount */}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '18px', fontWeight: '700', color: methodColor(payment.payment_method) }}>{money(payment.amount)}</div>
+                      <div style={{ fontSize: '18px', fontWeight: '700', color: accentColor, textDecoration: isVoid ? 'line-through' : 'none' }}>{money(payment.amount)}</div>
                     </div>
                   </div>
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </motion.div>
       )}
@@ -192,12 +225,17 @@ export default function PaymentsTab() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Payment Info */}
             <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment</div>
                   <div style={{ fontSize: '15px', fontWeight: '600' }}>{detailModal.payment_number}</div>
+                  {detailModal.is_void && (
+                    <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--accent-red)', fontWeight: '600' }}>
+                      VOIDED{detailModal.void_reason ? ` — ${detailModal.void_reason}` : ''}
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: methodColor(detailModal.payment_method) }}>{money(detailModal.amount)}</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: detailModal.is_void ? 'var(--accent-red)' : Number(detailModal.amount) < 0 ? 'var(--accent-orange)' : methodColor(detailModal.payment_method), textDecoration: detailModal.is_void ? 'line-through' : 'none' }}>{money(detailModal.amount)}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                 <MiniInfo label="Date" value={detailModal.payment_date ? new Date(detailModal.payment_date).toLocaleDateString() : '-'} />
@@ -205,6 +243,18 @@ export default function PaymentsTab() {
                 <MiniInfo label="Request" value={detailModal.stock_request?.request_number || '-'} />
                 {detailModal.notes && <MiniInfo label="Notes" value={detailModal.notes} />}
               </div>
+              {/* Void button */}
+              {canVoidPayment && !detailModal.is_void && Number(detailModal.amount) > 0 && (
+                <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--glass-border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setVoidModal(detailModal)}
+                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--accent-red)', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '500' }}
+                  >
+                    <XCircle size={14} /> Void Payment
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Driver Summary */}
@@ -279,6 +329,36 @@ export default function PaymentsTab() {
               </div>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Void Payment Modal */}
+      <Modal open={!!voidModal} title={`Void Payment ${voidModal?.payment_number || ''}`} onClose={() => { setVoidModal(null); setVoidReason(''); }} width="480px">
+        {voidModal && (
+          <>
+            <div style={{ padding: '14px 16px', marginBottom: '16px', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <AlertCircle size={16} color="var(--accent-red)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Voiding this payment will create a reverse transaction. The original record stays for audit. The driver's outstanding balance will be updated automatically.
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: '12px 14px', marginBottom: '16px', background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '13px' }}>
+              Voiding <strong>{money(voidModal.amount)}</strong> from <strong>{voidModal.stock_request?.driver?.full_name || voidModal.driver?.full_name || 'Unknown'}</strong>
+            </div>
+            <FormField label="Reason for voiding" required>
+              <FormTextarea value={voidReason} onChange={setVoidReason} placeholder="e.g. Wrong amount, duplicate payment..." rows={3} />
+            </FormField>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button type="button" onClick={() => { setVoidModal(null); setVoidReason(''); }} style={{ flex: 1, background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: '500' }}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleVoid} disabled={voiding || !voidReason.trim()} style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-red), #dc2626)', border: 'none', color: 'white', padding: '10px 18px', borderRadius: '10px', cursor: voiding ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: (voiding || !voidReason.trim()) ? 0.6 : 1 }}>
+                {voiding ? 'Voiding...' : 'Confirm Void'}
+              </button>
+            </div>
+          </>
         )}
       </Modal>
 

@@ -180,18 +180,18 @@ export default function ReportsPage() {
                 {driverPayroll?.payout_date && <> • Payout: <strong style={{ color: 'var(--accent-green)' }}>{driverPayroll.payout_date}</strong></>}
               </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="reports-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <RefreshButton onClick={() => loadAll()} loading={reportsLoading} title="Refresh reports" />
               <button onClick={() => setFiltersOpen(!filtersOpen)} style={{ background: filtersOpen || hasFilters ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hasFilters ? 'rgba(59, 130, 246, 0.4)' : 'var(--glass-border)'}`, color: hasFilters ? 'var(--accent-blue)' : 'var(--text-secondary)', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '500' }}>
                 <Filter size={14} /> Filters {hasFilters && '•'}
               </button>
-              <button onClick={() => exportReportPDF('active')} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
-                <Download size={14} /> Active View PDF
+              <button onClick={() => exportReportPDF('active')} className="glass-button reports-export-btn" style={{ fontSize: '13px', padding: '8px 14px' }}>
+                <Download size={14} /> <span className="reports-export-label">Active View</span> PDF
               </button>
-              <button onClick={() => exportReportPDF('full')} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
-                <Download size={14} /> Full PDF
+              <button onClick={() => exportReportPDF('full')} className="glass-button reports-export-btn" style={{ fontSize: '13px', padding: '8px 14px' }}>
+                <Download size={14} /> <span className="reports-export-label">Full</span> PDF
               </button>
-              <button onClick={exportCSV} className="glass-button" style={{ fontSize: '13px', padding: '8px 14px' }}>
+              <button onClick={exportCSV} className="glass-button reports-export-btn" style={{ fontSize: '13px', padding: '8px 14px' }}>
                 <Download size={14} /> CSV
               </button>
             </div>
