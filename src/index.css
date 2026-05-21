@@ -196,6 +196,18 @@ body {
   50% { opacity: 0.8; }
 }
 
+/* Refresh button spin */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: var(--surface-muted) !important;
+  border-color: var(--accent-blue) !important;
+  color: var(--accent-blue) !important;
+}
+
 /* Custom Select dropdown animation */
 @keyframes selectDropIn {
   from {

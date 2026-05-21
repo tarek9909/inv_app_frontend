@@ -99,9 +99,10 @@ export default function DashboardLayout() {
       {/* Sidebar */}
       <aside
         className={`glass-panel dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}
-        style={{ width: '280px', display: 'flex', flexDirection: 'column', padding: '24px' }}
+        style={{ width: '280px', display: 'flex', flexDirection: 'column', padding: '0' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
+        {/* Sidebar Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 24px 0 24px', marginBottom: '24px' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={20} color="white" />
           </div>
@@ -119,7 +120,8 @@ export default function DashboardLayout() {
           </button>
         </div>
 
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
+        {/* Scrollable Nav */}
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', padding: '0 24px', minHeight: 0 }}>
           {navItems.filter(item => canAccess(item)).map((item) => {
             const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
             return (
@@ -141,7 +143,8 @@ export default function DashboardLayout() {
           })}
         </nav>
 
-        <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Fixed Bottom - User Info */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', flexShrink: 0 }}>
               {user.full_name?.charAt(0).toUpperCase()}
