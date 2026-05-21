@@ -48,18 +48,6 @@ export default function DashboardHome() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Refresh button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          onClick={() => { reportStore.loadDashboard(); inventoryStores.items.load({ limit: 5 }); accountantStores.stockRequests.load({ limit: 5 }); accountantStores.payments.load({ limit: 5 }); }}
-          disabled={loading}
-          title="Refresh dashboard"
-          className="refresh-btn"
-          style={{ background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', width: '36px', height: '36px', borderRadius: '10px', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', opacity: loading ? 0.5 : 1 }}
-        >
-          <RefreshCw size={15} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-        </button>
-      </div>
       {/* Metrics Row */}
       <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         {METRICS.map((metric, idx) => {

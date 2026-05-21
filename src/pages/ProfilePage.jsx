@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { User, Lock, AlertCircle, Shield, Mail, Phone } from 'lucide-react';
 import TabBar from '../components/TabBar.jsx';
 import FormField, { FormInput, SubmitButton } from '../components/FormField.jsx';
+import RefreshButton from '../components/RefreshButton.jsx';
 import { toast } from '../components/Toast.jsx';
 import { authStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
@@ -19,6 +20,16 @@ export default function ProfilePage() {
   const [passwords, setPasswords] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [profileErrors, setProfileErrors] = useState({});
   const [passwordErrors, setPasswordErrors] = useState({});
+
+  const refreshProfile = async () => {
+    const refreshed = await authStore.loadCurrentUser().catch((err) => {
+      toast.error(err?.message || 'Failed to refresh profile');
+      return null;
+    });
+    if (refreshed) {
+      setProfile({ full_name: refreshed.full_name || '', email: refreshed.email || '', phone: refreshed.phone || '' });
+    }
+  };
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -55,6 +66,9 @@ export default function ProfilePage() {
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: '700' }}>{user?.full_name || 'My Account'}</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{user?.email} • {user?.role?.name || 'User'}</p>
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            <RefreshButton onClick={refreshProfile} loading={loading} title="Refresh profile" />
           </div>
         </div>
       </motion.div>

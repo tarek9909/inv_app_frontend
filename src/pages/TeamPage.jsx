@@ -5,6 +5,7 @@ import FilterBar from '../components/FilterBar.jsx';
 import Modal from '../components/Modal.jsx';
 import FormField, { FormInput, FormSelect, SubmitButton } from '../components/FormField.jsx';
 import PremiumCheckbox from '../components/PremiumCheckbox.jsx';
+import RefreshButton from '../components/RefreshButton.jsx';
 import { toast } from '../components/Toast.jsx';
 import { adminStores, authStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
@@ -32,15 +33,21 @@ export default function TeamPage() {
   const [roleForm, setRoleForm] = useState({ name: '', code: '', description: '' });
   const [rolePermissions, setRolePermissions] = useState([]);
   const [roleSaving, setRoleSaving] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   const can = (permission) => user?.role?.code === 'admin' || (user?.permissions || []).includes(permission);
   const canManageUsers = can('users.manage');
   const canManageRoles = can('roles.manage');
+  const canResetPasswords = can('users.reset_password');
 
-  useEffect(() => {
+  const loadTeam = () => {
     adminStores.users.load();
     adminStores.roles.load();
     if (canManageRoles) adminStores.permissions.load();
+  };
+
+  useEffect(() => {
+    loadTeam();
   }, [canManageRoles]);
 
   const openCreate = () => {
@@ -52,7 +59,7 @@ export default function TeamPage() {
 
   const openEdit = (row) => {
     setEditing(row);
-    setForm({ full_name: row.full_name || '', email: row.email || '', role_id: row.role_id || '', monthly_salary: row.driver_link?.driver?.monthly_salary ?? '' });
+    setForm({ full_name: row.full_name || '', email: row.email || '', role_id: row.role_id || '', monthly_salary: row.driver_link?.driver?.monthly_salary ?? '', password: '' });
     setErrors({});
     setModalOpen(true);
   };
@@ -63,6 +70,7 @@ export default function TeamPage() {
     if (!form.full_name?.trim()) errs.full_name = 'Name is required';
     if (!form.email?.trim()) errs.email = 'Email is required';
     if (!editing && (!form.password || form.password.length < 6)) errs.password = 'Min 6 characters';
+    if (editing && form.password && form.password.length < 6) errs.password = 'Min 6 characters';
     if (!form.role_id) errs.role_id = 'Role is required';
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
@@ -70,12 +78,16 @@ export default function TeamPage() {
     try {
       const selectedRole = (rolesState.rows || []).find((role) => Number(role.id) === Number(form.role_id));
       const driverValues = selectedRole?.code === 'driver' ? { monthly_salary: Number(form.monthly_salary || 0) } : {};
-      const { monthly_salary: ignoredSalary, ...userForm } = form;
+      const { monthly_salary: ignoredSalary, password, ...userForm } = form;
       if (editing) {
         await adminStores.users.update(editing.id, { full_name: userForm.full_name, email: userForm.email, role_id: userForm.role_id, ...driverValues });
+        if (canResetPasswords && password) {
+          setPasswordSaving(true);
+          await adminStores.users.resetPassword(editing.id, password, { must_change_password: false });
+        }
         toast.success('User updated');
       } else {
-        await adminStores.users.create({ ...userForm, ...driverValues });
+        await adminStores.users.create({ ...userForm, password, ...driverValues });
         toast.success('User created');
       }
       setModalOpen(false);
@@ -84,6 +96,7 @@ export default function TeamPage() {
       toast.error(err?.message || 'Operation failed');
     } finally {
       setSaving(false);
+      setPasswordSaving(false);
     }
   };
 
@@ -202,9 +215,12 @@ export default function TeamPage() {
             <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Roles & Permissions</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Control access to tabs, flows, actions, and subfeatures.</p>
           </div>
-          {canManageRoles && <button className="glass-button" style={{ fontSize: '13px', padding: '8px 16px' }} onClick={() => openRoleModal()}>
-            <Plus size={16} /> Add Role
-          </button>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshButton onClick={() => loadTeam()} loading={loading || rolesState.loading || permissionsState.loading} title="Refresh team" />
+            {canManageRoles && <button className="glass-button" style={{ fontSize: '13px', padding: '8px 16px' }} onClick={() => openRoleModal()}>
+              <Plus size={16} /> Add Role
+            </button>}
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
           {(rolesState.rows || []).map((role) => (
@@ -232,6 +248,11 @@ export default function TeamPage() {
               <FormInput type="password" value={form.password} onChange={(v) => { setForm({ ...form, password: v }); setErrors({ ...errors, password: null }); }} placeholder="Min 6 characters" />
             </FormField>
           )}
+          {editing && canResetPasswords && (
+            <FormField label="Change Password" error={errors.password}>
+              <FormInput type="password" value={form.password} onChange={(v) => { setForm({ ...form, password: v }); setErrors({ ...errors, password: null }); }} placeholder="Leave blank to keep current password" />
+            </FormField>
+          )}
           <FormField label="Role" required error={errors.role_id}>
             <FormSelect value={form.role_id} onChange={(v) => { setForm({ ...form, role_id: v }); setErrors({ ...errors, role_id: null }); }} options={roleOptions} placeholder="Select role" />
           </FormField>
@@ -240,7 +261,7 @@ export default function TeamPage() {
               <FormInput type="number" min="0" step="0.01" value={form.monthly_salary} onChange={(v) => setForm({ ...form, monthly_salary: v })} placeholder="0.00" />
             </FormField>
           )}
-          <SubmitButton loading={saving}>{editing ? 'Update' : 'Create'}</SubmitButton>
+          <SubmitButton loading={saving || passwordSaving}>{editing ? 'Update' : 'Create'}</SubmitButton>
         </form>
       </Modal>
 

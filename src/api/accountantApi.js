@@ -34,6 +34,7 @@ export const createAccountantApi = (client) => ({
     update: (id, payload) => client.patch(`/stock-requests/${id}`, payload),
     accept: (id) => client.post(`/stock-requests/${id}/accept`),
     complete: (id, payload) => client.post(`/stock-requests/${id}/complete`, payload),
+    reconcile: (id, payload) => client.post(`/stock-requests/${id}/reconcile`, payload || {}),
     cancel: (id) => client.post(`/stock-requests/${id}/cancel`),
     print: (id, payload) => client.post(`/stock-requests/${id}/print`, payload)
   },

@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { StatusBadge } from '../../components/DataTable.jsx';
 import StatusPipeline from '../../components/StatusPipeline.jsx';
 import FilterBar from '../../components/FilterBar.jsx';
-import Pagination, { useClientPagination } from '../../components/Pagination.jsx';
+import Pagination from '../../components/Pagination.jsx';
 import Modal, { ConfirmModal } from '../../components/Modal.jsx';
 import FormField, { FormInput, FormSelect, FormTextarea, SubmitButton } from '../../components/FormField.jsx';
+import RefreshButton from '../../components/RefreshButton.jsx';
 import { toast } from '../../components/Toast.jsx';
 import { accountantStores, inventoryStores, authStore, settingsStore } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
@@ -82,16 +83,54 @@ export default function StockRequestsTab() {
   const canAccept = (row) => ['draft', 'pending'].includes(row.request_status);
   const printEnabled = ['print', 'both'].includes(settings.accepted_request_fulfillment_mode || 'both');
   const canPrint = (row) => printEnabled && ['approved', 'completed'].includes(row.request_status);
+  const canReconcile = (row) => (
+    row.request_status === 'approved'
+    && row.driver_received_at
+    && ['receipt_partial', 'receipt_not_confirmed'].includes(row.driver_receipt_status)
+  );
+
+  const loadRequests = (overrides = {}) => accountantStores.stockRequests.load({
+    request_status: pipelineFilter,
+    request_type: typeFilter,
+    payment_status: paymentFilter,
+    search,
+    ...overrides
+  });
 
   const handleSearch = (value) => {
     setSearch(value);
     clearTimeout(searchTimeout);
     setSearchTimeout(setTimeout(() => {
-      accountantStores.stockRequests.load({ search: value, page: 1 });
+      accountantStores.stockRequests.load({
+        request_status: pipelineFilter,
+        request_type: typeFilter,
+        payment_status: paymentFilter,
+        search: value,
+        page: 1
+      });
     }, 300));
   };
 
-  const goToPage = (page) => accountantStores.stockRequests.load({ page });
+  const updatePipelineFilter = (value) => {
+    setPipelineFilter(value);
+    accountantStores.stockRequests.load({ request_status: value, request_type: typeFilter, payment_status: paymentFilter, search, page: 1 });
+  };
+
+  const updateListFilter = (key, value) => {
+    const nextType = key === 'type' ? value : typeFilter;
+    const nextPayment = key === 'payment' ? value : paymentFilter;
+    if (key === 'type') setTypeFilter(value);
+    if (key === 'payment') setPaymentFilter(value);
+    accountantStores.stockRequests.load({ request_status: pipelineFilter, request_type: nextType, payment_status: nextPayment, search, page: 1 });
+  };
+
+  const clearListFilters = () => {
+    setTypeFilter('');
+    setPaymentFilter('');
+    accountantStores.stockRequests.load({ request_status: pipelineFilter, request_type: '', payment_status: '', search, page: 1 });
+  };
+
+  const goToPage = (nextPage) => loadRequests({ page: nextPage });
   const { page = 1, pages = 1, total = 0 } = meta;
 
   // Pipeline stages
@@ -103,16 +142,6 @@ export default function StockRequestsTab() {
     { key: 'cancelled', label: 'Cancelled', color: 'var(--accent-red)', count: rows.filter((r) => r.request_status === 'cancelled').length }
   ], [rows]);
 
-  const filteredRows = useMemo(() => {
-    let result = rows;
-    if (pipelineFilter) result = result.filter((r) => r.request_status === pipelineFilter);
-    if (typeFilter) result = result.filter((r) => r.request_type === typeFilter);
-    if (paymentFilter) result = result.filter((r) => r.payment_status === paymentFilter);
-    return result;
-  }, [rows, pipelineFilter, typeFilter, paymentFilter]);
-
-  const pagination = useClientPagination(filteredRows, 12);
-
   const openCreate = () => { setDraft(createStockRequestDraft()); setFormOpen(true); };
 
   const addLineItem = () => { setDraft({ ...draft, items: [...draft.items, { item_id: '', quantity: '', unit_price: '' }] }); };
@@ -120,6 +149,22 @@ export default function StockRequestsTab() {
   const updateLineItemValues = (idx, values) => { const items = [...draft.items]; items[idx] = { ...items[idx], ...values }; setDraft({ ...draft, items }); };
   const removeLineItem = (idx) => { setDraft({ ...draft, items: draft.items.filter((_, i) => i !== idx) }); };
   const totals = calculateStockRequestTotals(draft);
+  const editTotals = calculateStockRequestTotals(editForm);
+
+  const addEditLineItem = () => setEditForm({ ...editForm, items: [...(editForm.items || []), { item_id: '', quantity: '', unit_price: '' }] });
+  const updateEditLineItem = (idx, field, value) => {
+    const items = [...(editForm.items || [])];
+    items[idx] = { ...items[idx], [field]: value };
+    setEditForm({ ...editForm, items });
+  };
+  const updateEditLineItemValues = (idx, values) => {
+    const items = [...(editForm.items || [])];
+    items[idx] = { ...items[idx], ...values };
+    setEditForm({ ...editForm, items });
+  };
+  const removeEditLineItem = (idx) => {
+    setEditForm({ ...editForm, items: (editForm.items || []).filter((_, i) => i !== idx) });
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -134,7 +179,7 @@ export default function StockRequestsTab() {
       await accountantStores.stockRequests.create(payload);
       toast.success('Stock request created');
       setFormOpen(false);
-      accountantStores.stockRequests.load();
+      loadRequests({ page: 1, force: true });
     } catch (err) { toast.error(err?.message || 'Failed to create request'); }
     finally { setSaving(false); }
   };
@@ -142,8 +187,9 @@ export default function StockRequestsTab() {
   const handleConfirmAction = async () => {
     try {
       if (confirmAction.type === 'accept') { await accountantStores.stockRequests.accept(confirmAction.row.id); toast.success('Request accepted'); }
+      else if (confirmAction.type === 'reconcile') { await accountantStores.stockRequests.reconcile(confirmAction.row.id, {}); toast.success('Receipt reconciled'); }
       else { await accountantStores.stockRequests.cancel(confirmAction.row.id); toast.success('Request cancelled'); }
-      accountantStores.stockRequests.load();
+      loadRequests({ force: true });
     } catch (err) { toast.error(err?.message || 'Action failed'); }
     setConfirmAction(null);
   };
@@ -153,7 +199,30 @@ export default function StockRequestsTab() {
     catch (err) { toast.error(err?.message || 'Failed to load request'); }
   };
 
-  const openEdit = (row) => { setEditModal(row); setEditForm({ notes: row.notes || '', request_status: row.request_status || 'pending' }); };
+  const openEdit = async (row) => {
+    try {
+      const result = await accountantStores.stockRequests.loadOne(row.id);
+      const request = result.data || row;
+      setEditModal(request);
+      setEditForm({
+        driver_id: request.driver_id || request.driver?.id || '',
+        request_date: request.request_date || todayIsoDate(),
+        request_type: request.request_type || 'stock_out',
+        discount_amount: request.discount_amount || 0,
+        notes: request.notes || '',
+        request_status: request.request_status || 'pending',
+        items: (request.items || []).map((line) => ({
+          id: line.id,
+          item_id: line.item_id,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          notes: line.notes || ''
+        }))
+      });
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load request');
+    }
+  };
 
   const openPrint = async (row) => {
     try { const result = await accountantStores.stockRequests.loadOne(row.id); setPrintModal(result.data || row); setPrintStatus(''); }
@@ -176,15 +245,37 @@ export default function StockRequestsTab() {
     try {
       await accountantStores.stockRequests.complete(completeModal.id, { ...completePayment, payment_amount: amount });
       toast.success(isReturn ? 'Return completed and credited' : amount > 0 ? 'Request completed and payment recorded' : 'Request completed with missing payment');
-      setCompleteModal(null); accountantStores.stockRequests.load(); accountantStores.payments.load().catch(() => {});
+      setCompleteModal(null); loadRequests({ force: true }); accountantStores.payments.load().catch(() => {});
     } catch (err) { toast.error(err?.message || 'Failed to complete request'); }
     finally { setCompleteSaving(false); }
   };
 
   const handleEdit = async (event) => {
     event.preventDefault();
+    if (!editForm.driver_id) { toast.error('Please select a driver'); return; }
+    if (!editForm.items?.length) { toast.error('Add at least one line item'); return; }
+    for (const item of editForm.items) {
+      if (!item.item_id || !item.quantity || Number(item.quantity) <= 0) { toast.error('All line items must have an item and valid quantity'); return; }
+    }
     setEditSaving(true);
-    try { await accountantStores.stockRequests.update(editModal.id, editForm); toast.success('Stock request updated'); setEditModal(null); accountantStores.stockRequests.load(); }
+    try {
+      const payload = {
+        ...editForm,
+        driver_id: Number(editForm.driver_id),
+        discount_amount: Number(editForm.discount_amount || 0),
+        items: editForm.items.map((line) => ({
+          id: line.id ? Number(line.id) : undefined,
+          item_id: Number(line.item_id),
+          quantity: Number(line.quantity),
+          unit_price: Number(line.unit_price) || 0,
+          notes: line.notes || ''
+        }))
+      };
+      await accountantStores.stockRequests.update(editModal.id, payload);
+      toast.success('Stock request updated');
+      setEditModal(null);
+      loadRequests({ force: true });
+    }
     catch (err) { toast.error(err?.message || 'Failed to update request'); }
     finally { setEditSaving(false); }
   };
@@ -215,7 +306,7 @@ export default function StockRequestsTab() {
   return (
     <>
       {/* Pipeline */}
-      <StatusPipeline stages={pipelineStages} active={pipelineFilter} onChange={setPipelineFilter} />
+      <StatusPipeline stages={pipelineStages} active={pipelineFilter} onChange={updatePipelineFilter} />
 
       {/* Filters */}
       <FilterBar
@@ -223,8 +314,8 @@ export default function StockRequestsTab() {
           { key: 'type', label: 'Type', value: typeFilter, options: [{ value: 'stock_out', label: 'Stock Out' }, { value: 'stock_return', label: 'Stock Return' }] },
           { key: 'payment', label: 'Payment', value: paymentFilter, options: [{ value: 'pending', label: 'Unpaid' }, { value: 'partially_paid', label: 'Partial' }, { value: 'paid', label: 'Paid' }] }
         ]}
-        onChange={(key, value) => { if (key === 'type') setTypeFilter(value); if (key === 'payment') setPaymentFilter(value); }}
-        onClear={() => { setTypeFilter(''); setPaymentFilter(''); }}
+        onChange={updateListFilter}
+        onClear={clearListFilters}
       />
 
       {/* Toolbar */}
@@ -233,6 +324,7 @@ export default function StockRequestsTab() {
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)} placeholder="Search requests..." className="glass-input" style={{ paddingLeft: '36px', padding: '10px 12px 10px 36px', fontSize: '13px' }} />
         </div>
+        <RefreshButton onClick={() => loadRequests({ force: true })} loading={loading} />
         <div style={{ marginLeft: 'auto' }}>
           {can('stock_requests.create') && (
             <button className="glass-button" style={{ fontSize: '13px', padding: '10px 18px' }} onClick={openCreate}>
@@ -256,22 +348,17 @@ export default function StockRequestsTab() {
         <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
           <AlertCircle size={32} color="var(--accent-red)" style={{ marginBottom: '12px' }} />
           <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>{error?.message || 'Failed to load requests'}</p>
-          <button onClick={() => accountantStores.stockRequests.load()} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Retry</button>
+          <button onClick={() => loadRequests({ force: true })} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Retry</button>
         </div>
       ) : rows.length === 0 ? (
         <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
           <ClipboardList size={32} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
           <p style={{ color: 'var(--text-muted)' }}>No stock requests found</p>
         </div>
-      ) : filteredRows.length === 0 ? (
-        <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
-          <ClipboardList size={32} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
-          <p style={{ color: 'var(--text-muted)' }}>No requests match the current filters</p>
-        </div>
       ) : (
         <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           <AnimatePresence>
-            {pagination.items.map((req, idx) => (
+            {rows.map((req, idx) => (
               <motion.div key={req.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: idx * 0.03, duration: 0.25 }} className="glass-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', aspectRatio: '1' }}>
                 {/* Header */}
                 <div style={{ padding: '18px 20px 14px', background: statusGradient(req.request_status), borderBottom: '1px solid var(--glass-border)' }}>
@@ -303,6 +390,7 @@ export default function StockRequestsTab() {
                     {can('stock_requests.update') && editableStatuses.includes(req.request_status) && <CardAction icon={Edit} label="Edit" onClick={() => openEdit(req)} color="var(--accent-blue)" />}
                     {can('stock_requests.accept') && canAccept(req) && <CardAction icon={CheckCircle} label="Accept" onClick={() => setConfirmAction({ type: 'accept', row: req })} color="var(--accent-blue)" />}
                     {can('stock_requests.complete') && canComplete(req) && <CardAction icon={CheckCircle} label="Complete" onClick={() => openComplete(req)} color="var(--accent-green)" />}
+                    {can('stock_requests.update') && canReconcile(req) && <CardAction icon={RefreshCw} label="Reconcile" onClick={() => setConfirmAction({ type: 'reconcile', row: req })} color="var(--accent-orange)" />}
                     {can('stock_requests.print') && canPrint(req) && <CardAction icon={Printer} label="Print" onClick={() => openPrint(req)} color="var(--accent-orange)" />}
                     {can('stock_requests.cancel') && canCancel(req) && <CardAction icon={XCircle} label="Cancel" onClick={() => setConfirmAction({ type: 'cancel', row: req })} color="var(--accent-red)" />}
                   </div>
@@ -314,8 +402,8 @@ export default function StockRequestsTab() {
       )}
 
       {/* Pagination */}
-      {!loading && !error && filteredRows.length > 0 && (
-        <Pagination page={pagination.page} pages={pagination.pages} total={pagination.total} onPageChange={pagination.setPage} label="requests" />
+      {!loading && !error && rows.length > 0 && (
+        <Pagination page={page} pages={pages} total={total} onPageChange={goToPage} label="requests" />
       )}
 
       {/* Create Modal */}
@@ -342,16 +430,34 @@ export default function StockRequestsTab() {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal open={!!editModal} title={`Edit ${editModal?.request_number || ''}`} onClose={() => setEditModal(null)} width="480px">
+      <Modal open={!!editModal} title={`Edit ${editModal?.request_number || ''}`} onClose={() => setEditModal(null)} width="620px">
         <form onSubmit={handleEdit}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <FormField label="Driver" required><FormSelect value={editForm.driver_id} onChange={(v) => setEditForm({ ...editForm, driver_id: v })} options={driverOptions} placeholder="Select driver" /></FormField>
+            <FormField label="Type"><FormSelect value={editForm.request_type} onChange={(v) => setEditForm({ ...editForm, request_type: v })} options={REQUEST_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') }))} /></FormField>
+            <FormField label="Date"><FormInput type="date" value={editForm.request_date} onChange={(v) => setEditForm({ ...editForm, request_date: v })} /></FormField>
+          </div>
           <FormField label="Request Status"><FormSelect value={editForm.request_status} onChange={(v) => setEditForm({ ...editForm, request_status: v })} options={editableStatuses.map((s) => ({ value: s, label: s }))} /></FormField>
+          <LineItems draft={editForm} itemOptions={itemOptions} addLineItem={addEditLineItem} updateLineItem={updateEditLineItem} updateLineItemValues={updateEditLineItemValues} removeLineItem={removeEditLineItem} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
+            <FormField label="Discount"><FormInput type="number" value={editForm.discount_amount} onChange={(v) => setEditForm({ ...editForm, discount_amount: v })} min="0" step="0.01" /></FormField>
+            <FormField label="Total"><div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', fontSize: '16px', fontWeight: '600', color: 'var(--accent-green)' }}>${editTotals.total_amount.toFixed(2)}</div></FormField>
+          </div>
           <FormField label="Notes"><FormTextarea value={editForm.notes} onChange={(v) => setEditForm({ ...editForm, notes: v })} rows={3} /></FormField>
           <SubmitButton loading={editSaving}>Update Request</SubmitButton>
         </form>
       </Modal>
 
       {/* Confirm Action */}
-      <ConfirmModal open={!!confirmAction} title={confirmAction?.type === 'accept' ? 'Accept Request' : 'Cancel Request'} message={`Are you sure you want to ${confirmAction?.type} request ${confirmAction?.row?.request_number}?`} onConfirm={handleConfirmAction} onCancel={() => setConfirmAction(null)} />
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.type === 'accept' ? 'Accept Request' : confirmAction?.type === 'reconcile' ? 'Reconcile Receipt' : 'Cancel Request'}
+        message={confirmAction?.type === 'reconcile'
+          ? `Adjust ${confirmAction?.row?.request_number} to the driver's confirmed quantities?`
+          : `Are you sure you want to ${confirmAction?.type} request ${confirmAction?.row?.request_number}?`}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
+      />
 
       {/* Complete Modal */}
       <Modal open={!!completeModal} title={`Complete ${completeModal?.request_number || ''}`} onClose={() => setCompleteModal(null)} width="520px">

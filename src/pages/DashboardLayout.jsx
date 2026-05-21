@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Menu, X, Sun, Moon } from 'lucide-react';
+import { LogOut, LayoutDashboard, Package, Truck, Users, Activity, FileText, BarChart3, UserCog, Settings, ClipboardList, Menu, X, Sun, Moon, RefreshCw } from 'lucide-react';
 import { authStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
 import { useTheme } from '../hooks/useTheme.js';
+
+const RefreshContext = createContext(0);
+export const useRefreshKey = () => useContext(RefreshContext);
 import { motion, AnimatePresence } from 'framer-motion';
 import FormField, { FormInput, SubmitButton } from '../components/FormField.jsx';
 import { toast } from '../components/Toast.jsx';
@@ -11,6 +14,7 @@ import { toast } from '../components/Toast.jsx';
 export default function DashboardLayout() {
   const { user } = useStore(authStore);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { theme, toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -179,6 +183,15 @@ export default function DashboardLayout() {
             <h1 style={{ fontSize: '20px', fontWeight: '600' }}>{navItems.find(i => location.pathname === i.path || (i.path !== '/dashboard' && location.pathname.startsWith(i.path)))?.label || 'Dashboard'}</h1>
           </div>
           <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* Refresh */}
+            <button
+              onClick={() => setRefreshKey((k) => k + 1)}
+              title="Refresh page data"
+              className="refresh-btn"
+              style={{ background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+            >
+              <RefreshCw size={16} />
+            </button>
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -194,7 +207,9 @@ export default function DashboardLayout() {
         </header>
 
         <div style={{ flex: 1, overflow: 'auto' }}>
-          <Outlet />
+          <RefreshContext.Provider value={refreshKey}>
+            <Outlet key={refreshKey} />
+          </RefreshContext.Provider>
         </div>
       </main>
     </div>

@@ -6,6 +6,7 @@ import FilterBar from '../../components/FilterBar.jsx';
 import Pagination, { useClientPagination } from '../../components/Pagination.jsx';
 import Modal from '../../components/Modal.jsx';
 import FormField, { FormInput, FormSelect, SubmitButton } from '../../components/FormField.jsx';
+import RefreshButton from '../../components/RefreshButton.jsx';
 import { accountantStores, authStore } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
 import { toast } from '../../components/Toast.jsx';
@@ -79,6 +80,7 @@ export default function MonthlyTargetsTab() {
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)} placeholder="Search targets..." className="glass-input" style={{ paddingLeft: '36px', padding: '10px 12px 10px 36px', fontSize: '13px' }} />
         </div>
+        <RefreshButton onClick={() => accountantStores.monthlyTargets.load({ force: true })} loading={loading} />
         <div style={{ marginLeft: 'auto' }}>{canManage && <button className="glass-button" style={{ fontSize: '13px', padding: '10px 18px' }} onClick={openCreate}><Plus size={16} /> Add Target</button>}</div>
       </div>
 

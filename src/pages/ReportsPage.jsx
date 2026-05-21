@@ -8,6 +8,7 @@ import { getApiConfig, tokenStorage, buildQuery } from '../api/index.js';
 import { useStore } from '../hooks/useStore.js';
 import { StatusBadge } from '../components/DataTable.jsx';
 import CustomSelect from '../components/CustomSelect.jsx';
+import RefreshButton from '../components/RefreshButton.jsx';
 
 const TABS = [
   { key: 'payroll', label: 'Payroll' },
@@ -163,6 +164,7 @@ export default function ReportsPage() {
   }
 
   const hasFilters = startDate || endDate;
+  const reportsLoading = Object.values(loadingByKey).some(Boolean);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -179,6 +181,7 @@ export default function ReportsPage() {
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <RefreshButton onClick={() => loadAll()} loading={reportsLoading} title="Refresh reports" />
               <button onClick={() => setFiltersOpen(!filtersOpen)} style={{ background: filtersOpen || hasFilters ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hasFilters ? 'rgba(59, 130, 246, 0.4)' : 'var(--glass-border)'}`, color: hasFilters ? 'var(--accent-blue)' : 'var(--text-secondary)', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '500' }}>
                 <Filter size={14} /> Filters {hasFilters && '•'}
               </button>

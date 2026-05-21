@@ -26,6 +26,7 @@ export const createAccountantStores = ({ accountantApi = api.accountant } = {}) 
     loadOne: accountantApi.stockRequests.get,
     accept: accountantApi.stockRequests.accept,
     complete: accountantApi.stockRequests.complete,
+    reconcile: accountantApi.stockRequests.reconcile,
     cancel: accountantApi.stockRequests.cancel,
     print: accountantApi.stockRequests.print
   },

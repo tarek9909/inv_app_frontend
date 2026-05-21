@@ -6,6 +6,7 @@ import FilterBar from '../../components/FilterBar.jsx';
 import Pagination, { useClientPagination } from '../../components/Pagination.jsx';
 import Modal, { ConfirmModal } from '../../components/Modal.jsx';
 import FormField, { FormInput, FormSelect, FormTextarea, SubmitButton } from '../../components/FormField.jsx';
+import RefreshButton from '../../components/RefreshButton.jsx';
 import { toast } from '../../components/Toast.jsx';
 import { authStore, inventoryStores } from '../../state/index.js';
 import { useStore } from '../../hooks/useStore.js';
@@ -65,6 +66,7 @@ export default function CategoriesTab() {
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)} placeholder="Search categories..." className="glass-input" style={{ paddingLeft: '36px', padding: '10px 12px 10px 36px', fontSize: '13px' }} />
         </div>
+        <RefreshButton onClick={() => inventoryStores.categories.load({ force: true })} loading={loading} />
         <div style={{ marginLeft: 'auto' }}>{can('categories.manage') && <button className="glass-button" style={{ fontSize: '13px', padding: '10px 18px' }} onClick={openCreate}><Plus size={16} /> Add Category</button>}</div>
       </div>
 

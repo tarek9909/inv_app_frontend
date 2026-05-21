@@ -111,9 +111,6 @@ export default function PaymentsTab() {
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)} placeholder="Search payments..." className="glass-input" style={{ paddingLeft: '36px', padding: '10px 12px 10px 36px', fontSize: '13px' }} />
         </div>
-        <button onClick={() => accountantStores.payments.load()} disabled={loading} title="Refresh" className="refresh-btn" style={{ background: 'var(--surface-subtle)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', width: '36px', height: '36px', borderRadius: '10px', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', opacity: loading ? 0.5 : 1 }}>
-          <RefreshCw size={15} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-        </button>
         {canCreatePayment && (
           <button className="glass-button" style={{ fontSize: '13px', padding: '10px 18px', marginLeft: 'auto' }} onClick={openCreate}>
             <Plus size={16} /> Record Payment

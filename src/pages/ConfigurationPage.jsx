@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Save, Percent, Settings, Monitor } from 'lucide-react';
 import TabBar from '../components/TabBar.jsx';
 import FormField, { FormInput, FormSelect, SubmitButton } from '../components/FormField.jsx';
+import RefreshButton from '../components/RefreshButton.jsx';
 import { toast } from '../components/Toast.jsx';
 import { settingsStore } from '../state/index.js';
 import { useStore } from '../hooks/useStore.js';
@@ -19,6 +20,14 @@ export default function ConfigurationPage() {
 
   useEffect(() => { settingsStore.load().then((r) => setForm(r.data || {})).catch(() => {}); }, []);
   useEffect(() => { setForm(settings || {}); }, [settings]);
+
+  const refreshSettings = async () => {
+    const result = await settingsStore.load({ force: true }).catch((err) => {
+      toast.error(err?.message || 'Failed to refresh');
+      return null;
+    });
+    if (result?.data) setForm(result.data);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,6 +50,9 @@ export default function ConfigurationPage() {
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: '700' }}>System Configuration</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Manage workflows and commissions</p>
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            <RefreshButton onClick={refreshSettings} loading={loading} title="Refresh configuration" />
           </div>
         </div>
       </motion.div>
